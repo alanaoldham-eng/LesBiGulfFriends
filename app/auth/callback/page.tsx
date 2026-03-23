@@ -1,4 +1,5 @@
 "use client";
+export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabase/client";
@@ -18,7 +19,8 @@ export default function AuthCallbackPage() {
           return;
         }
         document.cookie = `lbgf_session=1; Path=/; SameSite=Lax`;
-        window.location.href = "/app";
+        const hasProfile = localStorage.getItem("lbgf_profile_started") === "1";
+        window.location.href = hasProfile ? "/app" : "/profile";
         return;
       }
 

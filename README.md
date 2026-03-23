@@ -137,6 +137,19 @@ This version improves first impressions:
 
 This helps you invite beta testers without showing internal member tools before they sign in.
 
+## 3.8) First-time onboarding persistence + profile-first redirect
+
+This version adds:
+- onboarding progress remembered in localStorage
+- login page nudges first-time visitors into onboarding
+- auth callback redirects first-time users to `/profile`
+- returning users land on `/app`
+
+It also disables Tina in `package.json` for simpler deployment:
+- `dev`: `next dev`
+- `build`: `next build`
+- `start`: `next start`
+
 ## 4) Tina setup
 
 This starter already includes a `tina/config.ts`.

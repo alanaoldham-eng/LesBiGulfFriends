@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 const STEPS = [
@@ -29,6 +29,10 @@ const STEPS = [
 export default function OnboardingPage() {
   const [step, setStep] = useState(0);
   const item = STEPS[step];
+
+  useEffect(() => {
+    localStorage.setItem("lbgf_onboarding_seen", "1");
+  }, [step]);
 
   return (
     <section className="hero">

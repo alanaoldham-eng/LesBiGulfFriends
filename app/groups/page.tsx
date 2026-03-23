@@ -14,7 +14,7 @@ export default function GroupsPage() {
     <>
       <section className="hero">
         <h1 style={{ margin: 0, fontSize: 28 }}>{content.title}</h1>
-      <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>{content.intro}</p>
+        <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>{content.intro}</p>
       </section>
       <div className="grid">
         {content.cards.map((card) => (

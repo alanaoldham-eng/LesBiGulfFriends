@@ -1,12 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
+  const [seenOnboarding, setSeenOnboarding] = useState(true);
+
+  useEffect(() => {
+    setSeenOnboarding(localStorage.getItem("lbgf_onboarding_seen") === "1");
+  }, []);
 
   const submit = async () => {
     setLoading(true);
@@ -35,6 +40,16 @@ export default function LoginPage() {
         <p style={{ fontSize: 16, lineHeight: 1.7, opacity: 0.9 }}>
           Use your email magic link to enter the beta. Once you’re in, you can create your profile, make friends, and join groups.
         </p>
+
+        {!seenOnboarding ? (
+          <div style={{ marginTop: 12, padding: 12, borderRadius: 16, border: "1px solid #efcad8", background: "#fff" }}>
+            <strong>New here?</strong>
+            <p style={{ margin: "8px 0 0", opacity: 0.8 }}>Take the onboarding tour first so the app feels easier and more exciting.</p>
+            <div style={{ marginTop: 10 }}>
+              <Link href="/onboarding" className="button secondary">Start onboarding</Link>
+            </div>
+          </div>
+        ) : null}
 
         <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
           <input

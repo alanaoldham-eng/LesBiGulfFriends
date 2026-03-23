@@ -1,4 +1,5 @@
 "use client";
+export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import { ClientShell } from "../../components/ClientShell";
@@ -51,6 +52,7 @@ export default function ProfilePage() {
         interests: interests.split(",").map((x) => x.trim()).filter(Boolean),
         city,
       });
+      localStorage.setItem("lbgf_profile_started", "1");
       setStatus("Profile saved.");
     } catch (e: any) {
       setStatus(e.message || "Unable to save profile.");
