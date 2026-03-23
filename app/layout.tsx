@@ -34,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   <Link href="/events">Events</Link>
   <Link href="/privacy">Privacy</Link>
   <Link href="/login">Login</Link>
+              <Link href="/signup">Sign up</Link>
 </nav>
             {children}
             <div className="footer-note">

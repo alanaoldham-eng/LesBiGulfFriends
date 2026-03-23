@@ -150,6 +150,22 @@ It also disables Tina in `package.json` for simpler deployment:
 - `build`: `next build`
 - `start`: `next start`
 
+## 3.9) Password auth + social login + display-name-first profile
+
+This version adds:
+- email + password sign-up
+- email + password sign-in
+- forgot-password flow
+- social login buttons for Google, Facebook, and X
+- callback flow that supports both `?code=` and `#access_token=`
+- redirect to `/profile` until a display name exists
+- profile copy that treats nickname/display name as the public identity
+
+Tina remains disabled in `package.json` for simpler deployment:
+- `dev`: `next dev`
+- `build`: `next build`
+- `start`: `next start`
+
 ## 4) Tina setup
 
 This starter already includes a `tina/config.ts`.
