@@ -10,22 +10,50 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const run = async () => {
       const url = new URL(window.location.href);
-      const code = url.searchParams.get("code");
 
+      // 1) PKCE/code flow
+      const code = url.searchParams.get("code");
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) {
           setMessage(error.message);
           return;
         }
-        document.cookie = `lbgf_session=1; Path=/; SameSite=Lax`;
+
+        document.cookie = "lbgf_session=1; Path=/; SameSite=Lax";
         const hasProfile = localStorage.getItem("lbgf_profile_started") === "1";
         window.location.href = hasProfile ? "/app" : "/profile";
         return;
       }
 
-      setMessage("Missing auth code. Please try the magic link again.");
+      // 2) Hash token flow
+      const hash = window.location.hash.startsWith("#")
+        ? window.location.hash.slice(1)
+        : "";
+      const hashParams = new URLSearchParams(hash);
+      const access_token = hashParams.get("access_token");
+      const refresh_token = hashParams.get("refresh_token");
+
+      if (access_token && refresh_token) {
+        const { error } = await supabase.auth.setSession({
+          access_token,
+          refresh_token,
+        });
+
+        if (error) {
+          setMessage(error.message);
+          return;
+        }
+
+        document.cookie = "lbgf_session=1; Path=/; SameSite=Lax";
+        const hasProfile = localStorage.getItem("lbgf_profile_started") === "1";
+        window.location.href = hasProfile ? "/app" : "/profile";
+        return;
+      }
+
+      setMessage("Missing auth code or tokens. Please try the magic link again.");
     };
+
     run();
   }, []);
 
