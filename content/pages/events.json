@@ -1,0 +1,14 @@
+{
+  "title": "Events",
+  "intro": "Start with a content-managed events landing page. Connect real RSVP and check-in logic after the MVP content layer is stable.",
+  "cards": [
+    {
+      "title": "Micro-events",
+      "body": "Coffee, walks, trivia, or quick meetups."
+    },
+    {
+      "title": "Community events",
+      "body": "Larger gatherings, support circles, or themed nights."
+    }
+  ]
+}

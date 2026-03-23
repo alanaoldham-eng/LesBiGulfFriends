@@ -1,0 +1,14 @@
+{
+  "title": "Groups",
+  "intro": "This page is content-managed in Tina and can become your public groups landing page before deeper app features ship.",
+  "cards": [
+    {
+      "title": "Interest groups",
+      "body": "Art, hiking, spirituality, queer history, food, and more."
+    },
+    {
+      "title": "Location groups",
+      "body": "New Orleans, Gulf Coast, and neighborhood-based circles."
+    }
+  ]
+}

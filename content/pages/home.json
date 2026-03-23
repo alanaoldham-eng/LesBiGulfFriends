@@ -1,0 +1,18 @@
+{
+  "title": "A safer, warmer web home for Les Bi Gulf Friends",
+  "intro": "This starter keeps things simple: a mobile-first Next.js site on Vercel, Supabase for auth and app data, and Tina CMS + GitHub for editable content.",
+  "cards": [
+    {
+      "title": "Friends first",
+      "body": "Keep messaging gated behind friendship so there are no cold DMs."
+    },
+    {
+      "title": "Groups and community",
+      "body": "Use groups for interest-based conversation without swipe pressure."
+    },
+    {
+      "title": "Events later",
+      "body": "Start with content, auth, and community pages. Add events/check-ins in phase two."
+    }
+  ]
+}

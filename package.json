@@ -1,0 +1,25 @@
+{
+  "name": "les-bi-gulf-friends-web",
+  "private": true,
+  "version": "0.2.0",
+  "scripts": {
+    "dev": "tinacms dev -c \"next dev\"",
+    "build": "tinacms build && next build",
+    "start": "tinacms build && next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.50.0",
+    "next": "^15.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tinacms": "^2.7.0"
+  },
+  "devDependencies": {
+    "@tinacms/cli": "^1.9.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.0"
+  }
+}
