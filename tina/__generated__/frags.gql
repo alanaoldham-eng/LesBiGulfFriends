@@ -1,0 +1,16 @@
+fragment PageParts on Page {
+  __typename
+  title
+  intro
+  cards {
+    __typename
+    title
+    body
+  }
+}
+
+fragment CommunityParts on Community {
+  __typename
+  title
+  body
+}
