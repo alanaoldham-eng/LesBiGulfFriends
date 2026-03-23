@@ -126,6 +126,17 @@ This is still an MVP starter:
 - event flows are not wired yet
 - auth/session handling is intentionally simple for beta and should be hardened before public launch
 
+## 3.7) Branded onboarding + clean public landing flow
+
+This version improves first impressions:
+
+- adds `/onboarding` as a fun branded onboarding tour
+- removes member-only links from the public landing layout
+- keeps logged-in tools inside the protected member area
+- makes `/login` feel more guided and less overwhelming
+
+This helps you invite beta testers without showing internal member tools before they sign in.
+
 ## 4) Tina setup
 
 This starter already includes a `tina/config.ts`.

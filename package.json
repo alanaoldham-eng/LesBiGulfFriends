@@ -1,7 +1,7 @@
 {
   "name": "les-bi-gulf-friends-web",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "scripts": {
     "dev": "tinacms dev -c \"next dev\"",
     "build": "next build",

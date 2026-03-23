@@ -1,6 +1,6 @@
 {
   "title": "Events",
-  "intro": "Start with a content-managed events landing page. Connect real RSVP and check-in logic after the MVP content layer is stable.",
+  "intro": "Events are part of the roadmap, but this public page keeps the experience simple while the member experience matures behind login.",
   "cards": [
     {
       "title": "Micro-events",

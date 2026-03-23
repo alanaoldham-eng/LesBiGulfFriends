@@ -1,6 +1,6 @@
 {
   "title": "Groups",
-  "intro": "This page is content-managed in Tina and can become your public groups landing page before deeper app features ship.",
+  "intro": "See the kinds of circles members can join after login. The public site should inspire curiosity without overwhelming new people with member tools.",
   "cards": [
     {
       "title": "Interest groups",

@@ -28,17 +28,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </header>
           <main className="container">
             <nav className="nav">
-              <Link href="/">Home</Link>
-              <Link href="/groups">Groups</Link>
-              <Link href="/events">Events</Link>
-              <Link href="/privacy">Privacy</Link>
-              <Link href="/login">Login</Link>
-              <Link href="/app">Member Home</Link>
-              <Link href="/profile">Profile</Link>
-              <Link href="/friends">Friends</Link>
-              <Link href="/messages">Messages</Link>
-              <a href="/admin/index.html">Tina Admin</a>
-            </nav>
+  <Link href="/">Home</Link>
+  <Link href="/onboarding">Onboarding</Link>
+  <Link href="/groups">Groups</Link>
+  <Link href="/events">Events</Link>
+  <Link href="/privacy">Privacy</Link>
+  <Link href="/login">Login</Link>
+</nav>
             {children}
             <div className="footer-note">
               Start with the web app first. Native iOS and Android can come later with Expo.

@@ -10,10 +10,8 @@ export async function POST(request: NextRequest) {
 
     const supabase = createServerSupabase();
     const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    request.headers.get("x-forwarded-proto") && request.headers.get("x-forwarded-host")
-    ? `${request.headers.get("x-forwarded-proto")}://${request.headers.get("x-forwarded-host")}`
-    : request.headers.get("origin") ||
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      request.headers.get("origin") ||
       "http://localhost:3000";
 
     const { error } = await supabase.auth.signInWithOtp({

@@ -79,3 +79,83 @@ a { color: inherit; text-decoration: none; }
   font-size: 14px;
   font-weight: 700;
 }
+
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid #efcad8;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  color: #8d2d5d;
+}
+.landing-hero {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #f1dfe8;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(244, 182, 198, 0.35), transparent 35%),
+    linear-gradient(180deg, #fff6fa 0%, #fff 100%);
+  box-shadow: 0 14px 34px rgba(141,45,93,0.08);
+}
+.trust-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 700;
+  opacity: 0.8;
+}
+.landing-secondary {
+  margin-top: 22px;
+  display: grid;
+  gap: 14px;
+}
+.onboarding-shell {
+  display: grid;
+  gap: 18px;
+}
+.onboarding-progress {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 8px;
+}
+.onboarding-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #ead5df;
+}
+.onboarding-dot.active {
+  background: #8d2d5d;
+}
+.onboarding-card, .login-card {
+  border: 1px solid #f1dfe8;
+  border-radius: 28px;
+  padding: 22px 18px;
+  background:
+    radial-gradient(circle at top right, rgba(244, 182, 198, 0.28), transparent 34%),
+    linear-gradient(180deg, #fff7fb 0%, #fff 100%);
+  box-shadow: 0 14px 34px rgba(141,45,93,0.08);
+}
+.onboarding-emoji {
+  font-size: 44px;
+  line-height: 1;
+}
+.member-banner {
+  display: inline-flex;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #f8e8ef;
+  color: #8d2d5d;
+  font-size: 13px;
+  font-weight: 800;
+  border: 1px solid #efcad8;
+}

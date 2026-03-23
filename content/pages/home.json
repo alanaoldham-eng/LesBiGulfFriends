@@ -1,18 +1,18 @@
 {
-  "title": "A safer, warmer web home for Les Bi Gulf Friends",
-  "intro": "This starter keeps things simple: a mobile-first Next.js site on Vercel, Supabase for auth and app data, and Tina CMS + GitHub for editable content.",
+  "title": "A warm, safer way to meet lesbian and bi women on the Gulf Coast",
+  "intro": "Les Bi Gulf Friends is built for real community: gentle onboarding, friendship-first messaging, interest-based groups, and a women-centered experience that feels exciting without overwhelm.",
   "cards": [
     {
-      "title": "Friends first",
-      "body": "Keep messaging gated behind friendship so there are no cold DMs."
+      "title": "Onboard with ease",
+      "body": "Guide new members through a clear, branded welcome flow before they ever see the member tools."
     },
     {
-      "title": "Groups and community",
-      "body": "Use groups for interest-based conversation without swipe pressure."
+      "title": "Friends before DMs",
+      "body": "Keep the vibe calmer and safer by unlocking direct messages only after mutual friendship."
     },
     {
-      "title": "Events later",
-      "body": "Start with content, auth, and community pages. Add events/check-ins in phase two."
+      "title": "Groups that feel human",
+      "body": "Start with interest-based groups and conversation. Add events, check-ins, and vibe mode later."
     }
   ]
 }
