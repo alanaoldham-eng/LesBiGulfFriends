@@ -150,6 +150,18 @@ It also disables Tina in `package.json` for simpler deployment:
 - `build`: `next build`
 - `start`: `next start`
 
+## 4.3) Cleanup package
+
+This version removes the old magic-link API route and strips leftover auth UI from earlier iterations.
+The app is now centered on:
+- email + password sign-up
+- email + password login
+- email verification at account creation
+- forgot-password flow
+- display-name-first profile setup
+
+Tina remains disabled in `package.json`.
+
 ## 4) Tina setup
 
 This starter already includes a `tina/config.ts`.

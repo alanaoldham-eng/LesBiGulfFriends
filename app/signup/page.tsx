@@ -39,15 +39,30 @@ export default function SignupPage() {
         <div className="pill">Create your account</div>
         <h1 style={{ margin: 0, fontSize: 34, lineHeight: 1.05 }}>Join the beta</h1>
         <p style={{ fontSize: 16, lineHeight: 1.7, opacity: 0.9 }}>
-          Create your account with email and password. After you verify your email once, you can return with your password — no repeated magic links.
+          Create your account with email and password. After you verify your email once, you can return with your password.
         </p>
         <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com"
-            style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, width: "100%" }} />
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Create a password"
-            style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, width: "100%" }} />
-          <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm password"
-            style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, width: "100%" }} />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, width: "100%" }}
+          />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Create a password"
+            style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, width: "100%" }}
+          />
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Confirm password"
+            style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, width: "100%" }}
+          />
           <button className="button" onClick={submit} disabled={loading || !email || !password || !confirmPassword}>
             {loading ? "Creating..." : "Create account"}
           </button>

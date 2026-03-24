@@ -63,3 +63,17 @@ In Supabase Authentication email/SMTP settings use:
 - forgot password
 - profile setup
 - create/join group
+
+## Account creation email failed
+
+If signup says "failed to send email", the app code is usually fine and the issue is on the auth email side.
+
+Check these in Supabase:
+1. Authentication email confirmation is enabled the way you expect
+2. Custom SMTP is configured
+3. Resend domain is verified
+4. Sender address matches the verified domain
+5. Site URL and Redirect URLs are correct
+
+Recommended sender:
+- onboarding@lesbigulffriends.com

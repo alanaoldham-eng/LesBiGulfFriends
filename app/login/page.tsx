@@ -42,7 +42,9 @@ export default function LoginPage() {
         {!seenOnboarding ? (
           <div style={{ marginTop: 12, padding: 12, borderRadius: 16, border: "1px solid #efcad8", background: "#fff" }}>
             <strong>New here?</strong>
-            <p style={{ margin: "8px 0 0", opacity: 0.8 }}>Take the onboarding tour first so the app feels easier and more exciting.</p>
+            <p style={{ margin: "8px 0 0", opacity: 0.8 }}>
+              Take the onboarding tour first so the app feels easier and more exciting.
+            </p>
             <div style={{ marginTop: 10 }}>
               <Link href="/onboarding" className="button secondary">Start onboarding</Link>
             </div>
@@ -50,10 +52,20 @@ export default function LoginPage() {
         ) : null}
 
         <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com"
-            style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, width: "100%" }} />
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Your password"
-            style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, width: "100%" }} />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, width: "100%" }}
+          />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Your password"
+            style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, width: "100%" }}
+          />
           <button className="button" onClick={submitPassword} disabled={loading || !email || !password}>
             {loading ? "Logging in..." : "Log in"}
           </button>
