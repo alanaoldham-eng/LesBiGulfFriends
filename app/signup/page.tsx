@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { supabase } from "../../lib/supabase/client";
-import { AuthButtons } from "../../components/AuthButtons";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -26,7 +25,7 @@ export default function SignupPage() {
         options: { emailRedirectTo: redirectTo },
       });
       if (error) throw error;
-      setStatus("Account created. Check your email once to verify, then come back and sign in with your password.");
+      setStatus("Account created. Check your email once to verify your address, then come back and log in with your password.");
     } catch (e: any) {
       setStatus(e.message || "Unable to create account.");
     } finally {
@@ -40,7 +39,7 @@ export default function SignupPage() {
         <div className="pill">Create your account</div>
         <h1 style={{ margin: 0, fontSize: 34, lineHeight: 1.05 }}>Join the beta</h1>
         <p style={{ fontSize: 16, lineHeight: 1.7, opacity: 0.9 }}>
-          Sign up with email and password, or use a social sign-in. After verifying your email once, you can come back with your password.
+          Create your account with email and password. After you verify your email once, you can return with your password — no repeated magic links.
         </p>
         <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com"
@@ -54,10 +53,8 @@ export default function SignupPage() {
           </button>
           {status ? <p style={{ margin: 0, opacity: 0.8 }}>{status}</p> : null}
         </div>
-        <div style={{ marginTop: 18, opacity: 0.7, fontWeight: 700 }}>or</div>
-        <AuthButtons />
         <div style={{ marginTop: 16 }}>
-          <Link href="/login" style={{ fontWeight: 700, opacity: 0.8 }}>Already have an account? Sign in.</Link>
+          <Link href="/login" style={{ fontWeight: 700, opacity: 0.8 }}>Already have an account? Log in.</Link>
         </div>
       </div>
     </section>

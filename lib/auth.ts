@@ -14,15 +14,3 @@ export async function signOutEverywhere() {
   document.cookie = "lbgf_session=; Path=/; Max-Age=0; SameSite=Lax";
   window.location.href = "/login";
 }
-
-export async function signInWithGoogle() {
-  await supabase.auth.signInWithOAuth({ provider: "google" });
-}
-
-export async function signInWithFacebook() {
-  await supabase.auth.signInWithOAuth({ provider: "facebook" });
-}
-
-export async function signInWithTwitter() {
-  await supabase.auth.signInWithOAuth({ provider: "twitter" });
-}

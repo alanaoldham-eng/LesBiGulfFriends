@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../../lib/supabase/client";
-import { AuthButtons } from "../../components/AuthButtons";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -25,26 +24,7 @@ export default function LoginPage() {
       document.cookie = "lbgf_session=1; Path=/; SameSite=Lax";
       window.location.href = "/auth/callback";
     } catch (e: any) {
-      setStatus(e.message || "Unable to sign in.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const sendMagicLink = async () => {
-    setLoading(true);
-    setStatus("");
-    try {
-      const res = await fetch("/api/auth/magic-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Unable to send magic link");
-      setStatus("Magic link sent. Use this only as a backup if you forgot your password.");
-    } catch (e: any) {
-      setStatus(e.message || "Unable to send magic link");
+      setStatus(e.message || "Unable to log in.");
     } finally {
       setLoading(false);
     }
@@ -54,9 +34,9 @@ export default function LoginPage() {
     <section className="hero">
       <div className="login-card">
         <div className="pill">Private beta access</div>
-        <h1 style={{ margin: 0, fontSize: 34, lineHeight: 1.05 }}>Sign in</h1>
+        <h1 style={{ margin: 0, fontSize: 34, lineHeight: 1.05 }}>Log in</h1>
         <p style={{ fontSize: 16, lineHeight: 1.7, opacity: 0.9 }}>
-          Come back with your email and password, or use a social sign-in. Magic links stay available as a fallback.
+          Use your email and password to get back in quickly.
         </p>
 
         {!seenOnboarding ? (
@@ -75,20 +55,14 @@ export default function LoginPage() {
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Your password"
             style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, width: "100%" }} />
           <button className="button" onClick={submitPassword} disabled={loading || !email || !password}>
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? "Logging in..." : "Log in"}
           </button>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
             <Link href="/signup" style={{ fontWeight: 700, opacity: 0.8 }}>Create account</Link>
             <Link href="/forgot-password" style={{ fontWeight: 700, opacity: 0.8 }}>Forgot password?</Link>
           </div>
-          <button className="button secondary" onClick={sendMagicLink} disabled={loading || !email}>
-            Use magic link instead
-          </button>
           {status ? <p style={{ margin: 0, opacity: 0.8 }}>{status}</p> : null}
         </div>
-
-        <div style={{ marginTop: 18, opacity: 0.7, fontWeight: 700 }}>or continue with</div>
-        <AuthButtons />
       </div>
     </section>
   );

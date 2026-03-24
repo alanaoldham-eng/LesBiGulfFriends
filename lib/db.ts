@@ -144,10 +144,3 @@ export async function sendGroupMessage(group_id: string, sender_id: string, body
   const { error } = await supabase.from("group_messages").insert({ group_id, sender_id, body });
   if (error) throw error;
 }
-
-
-export async function getProfileById(userId: string) {
-  const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
-  if (error) throw error;
-  return data as Profile | null;
-}

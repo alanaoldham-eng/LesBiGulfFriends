@@ -62,9 +62,9 @@ export default function ProfilePage() {
   return (
     <ClientShell>
       <section className="hero">
-        <h1 style={{ margin: 0, fontSize: 30 }}>Create your public profile</h1>
+        <h1 style={{ margin: 0, fontSize: 30 }}>Your profile</h1>
         <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
-          Set a nickname or display name so the app shows that instead of your email address. This is your public identity inside the community.
+          Keep this simple for the MVP: display name, bio, interests, and city.
         </p>
       </section>
 
@@ -74,7 +74,7 @@ export default function ProfilePage() {
         <div className="grid">
           <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
             <div style={{ display: "grid", gap: 12 }}>
-              <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Nickname or display name"
+              <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Display name"
                 style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
               <textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Bio"
                 style={{ minHeight: 120, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
