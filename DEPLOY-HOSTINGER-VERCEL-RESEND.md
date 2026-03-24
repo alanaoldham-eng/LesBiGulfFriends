@@ -77,3 +77,13 @@ Check these in Supabase:
 
 Recommended sender:
 - onboarding@lesbigulffriends.com
+
+## v045 storage setup
+The new package uploads files directly to Supabase Storage.
+
+Buckets used:
+- profile-photos
+- chat-media
+
+The included SQL migration creates both buckets and the basic policies:
+- `supabase-v045-photo-main-group-attachments.sql`

@@ -40,7 +40,7 @@ export default function LoginPage() {
 
       if (profileError) throw new Error(profileError.message);
 
-      const hasDisplayName = !!profile?.display_name?.trim();
+      const hasDisplayName = !!profile?.display_name?.trim() && profile?.display_name !== "New Member";
       localStorage.setItem("lbgf_profile_started", hasDisplayName ? "1" : "0");
       window.location.href = hasDisplayName ? "/app" : "/profile";
     } catch (e: any) {

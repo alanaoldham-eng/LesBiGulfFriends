@@ -2,19 +2,34 @@
 
 import { supabase } from "./supabase/client";
 
+export type RelationshipStatus =
+  | "single"
+  | "coupled"
+  | "in an open relationship"
+  | "it's complicated";
+
 export type Profile = {
   id: string;
   display_name: string;
   bio: string | null;
   interests: string[] | null;
   photo_url: string | null;
+  photo_urls: string[] | null;
   city: string | null;
+  relationship_status: RelationshipStatus | null;
+  karma_points?: number | null;
 };
 
 export async function getMyProfile(userId: string) {
   const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
   if (error) throw error;
   return data as Profile;
+}
+
+export async function getProfileById(userId: string) {
+  const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+  if (error) throw error;
+  return data as Profile | null;
 }
 
 export async function upsertMyProfile(profile: Partial<Profile> & { id: string }) {
@@ -80,8 +95,15 @@ export async function listDmMessages(me: string, other: string) {
   return data || [];
 }
 
-export async function sendDm(sender_id: string, recipient_id: string, body: string) {
-  const { error } = await supabase.from("messages").insert({ sender_id, recipient_id, body });
+export async function sendDm(sender_id: string, recipient_id: string, body: string, media_url?: string | null, media_type?: string | null, link_url?: string | null) {
+  const { error } = await supabase.from("messages").insert({
+    sender_id,
+    recipient_id,
+    body: body ?? "",
+    media_url: media_url || null,
+    media_type: media_type || null,
+    link_url: link_url || null,
+  });
   if (error) throw error;
 }
 
@@ -106,7 +128,6 @@ export async function createGroup(payload: {
 }) {
   const { data, error } = await supabase.from("groups").insert(payload).select("*").single();
   if (error) throw error;
-  // auto-join owner
   const { error: e2 } = await supabase.from("group_members").insert({
     group_id: data.id,
     user_id: payload.created_by,
@@ -140,7 +161,70 @@ export async function listGroupMessages(group_id: string) {
   return data || [];
 }
 
-export async function sendGroupMessage(group_id: string, sender_id: string, body: string) {
-  const { error } = await supabase.from("group_messages").insert({ group_id, sender_id, body });
+export async function sendGroupMessage(group_id: string, sender_id: string, body: string, media_url?: string | null, media_type?: string | null, link_url?: string | null) {
+  const { error } = await supabase.from("group_messages").insert({
+    group_id,
+    sender_id,
+    body: body ?? "",
+    media_url: media_url || null,
+    media_type: media_type || null,
+    link_url: link_url || null,
+  });
   if (error) throw error;
+}
+
+function objectPathFromPublicUrl(bucket: string, url: string) {
+  const marker = `/storage/v1/object/public/${bucket}/`;
+  const idx = url.indexOf(marker);
+  return idx >= 0 ? decodeURIComponent(url.slice(idx + marker.length)) : null;
+}
+
+export async function uploadPublicImage(bucket: "profile-photos" | "chat-media", userId: string, file: File) {
+  const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
+  const path = `${userId}/${safeName}`;
+  const { error } = await supabase.storage.from(bucket).upload(path, file, {
+    cacheControl: "3600",
+    upsert: false,
+  });
+  if (error) throw error;
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+export async function deletePublicImage(bucket: "profile-photos" | "chat-media", url: string) {
+  const path = objectPathFromPublicUrl(bucket, url);
+  if (!path) return;
+  await supabase.storage.from(bucket).remove([path]);
+}
+
+
+export async function createInvite(inviter_id: string, invitee_email: string) {
+  const { data, error } = await supabase
+    .from("invites")
+    .insert({ inviter_id, invitee_email: invitee_email.toLowerCase(), status: "pending" })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function listMyInvites(inviter_id: string) {
+  const { data, error } = await supabase
+    .from("invites")
+    .select("*")
+    .eq("inviter_id", inviter_id)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getMainGroupId() {
+  const { data, error } = await supabase
+    .from("groups")
+    .select("id")
+    .ilike("name", "Main")
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.id || null;
 }

@@ -172,6 +172,41 @@ This version fixes the email verification and password login flow:
 
 Tina remains disabled in `package.json`.
 
+## 4.5) Photos, Main group auto-join, relationship status, chat attachments
+
+This version adds:
+- up to 3 profile photos with ordering and deletion
+- relationship status on profiles:
+  - single
+  - coupled
+  - in an open relationship
+  - it's complicated
+- automatic addition of new users to the Main group
+- picture and link support in private messages and group chat
+
+Run the included SQL migration:
+- `supabase-v045-photo-main-group-attachments.sql`
+
+After running it, test:
+- signup
+- profile save with 1–3 photos
+- relationship status save
+- DM with image/link
+- group chat with image/link
+
+## 4.6) Invites + karma + automatic friendships
+
+This version adds:
+- invite friends by email from the member area
+- automatic friendship creation when the invited friend signs up with that email
+- automatic karma point award to the inviter when the invited friend joins
+- profile now shows karma points
+- fixes the profile relationship-status TypeScript build error from v045
+
+Run both SQL files:
+- `supabase-v045-photo-main-group-attachments.sql`
+- `supabase-v046-invites-karma.sql`
+
 ## 4) Tina setup
 
 This starter already includes a `tina/config.ts`.
