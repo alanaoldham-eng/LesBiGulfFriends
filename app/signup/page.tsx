@@ -18,7 +18,7 @@ export default function SignupPage() {
     setLoading(true);
     setStatus("");
     try {
-      const redirectTo = `${window.location.origin}/auth/callback`;
+      const redirectTo = `${window.location.origin}/login?verified=1`;
       const { error } = await supabase.auth.signUp({
         email,
         password,
