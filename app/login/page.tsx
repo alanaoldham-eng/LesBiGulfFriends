@@ -14,7 +14,6 @@ export default function LoginPage() {
 
   useEffect(() => {
     setSeenOnboarding(localStorage.getItem("lbgf_onboarding_seen") === "1");
-
     const params = new URLSearchParams(window.location.search);
     setVerified(params.get("verified") === "1");
   }, []);
@@ -22,17 +21,28 @@ export default function LoginPage() {
   const submitPassword = async () => {
     setLoading(true);
     setStatus("");
-
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) {
+        throw new Error(userError?.message || "Unable to load user session.");
+      }
+
       document.cookie = "lbgf_session=1; Path=/; SameSite=Lax";
-      window.location.href = "/auth/callback";
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", userData.user.id)
+        .maybeSingle();
+
+      if (profileError) throw new Error(profileError.message);
+
+      const hasDisplayName = !!profile?.display_name?.trim();
+      localStorage.setItem("lbgf_profile_started", hasDisplayName ? "1" : "0");
+      window.location.href = hasDisplayName ? "/app" : "/profile";
     } catch (e: any) {
       setStatus(e.message || "Unable to log in.");
     } finally {
@@ -44,52 +54,28 @@ export default function LoginPage() {
     <section className="hero">
       <div className="login-card">
         <div className="pill">Private beta access</div>
-
-        <h1 style={{ margin: 0, fontSize: 34, lineHeight: 1.05 }}>
-          Log in
-        </h1>
-
+        <h1 style={{ margin: 0, fontSize: 34, lineHeight: 1.05 }}>Log in</h1>
         <p style={{ fontSize: 16, lineHeight: 1.7, opacity: 0.9 }}>
           Use your email and password to get back in quickly.
         </p>
 
         {verified ? (
-          <div
-            style={{
-              marginTop: 12,
-              padding: 12,
-              borderRadius: 16,
-              border: "1px solid #efcad8",
-              background: "#fff",
-            }}
-          >
+          <div style={{ marginTop: 12, padding: 12, borderRadius: 16, border: "1px solid #efcad8", background: "#fff" }}>
             <strong>Email verified.</strong>
             <p style={{ margin: "8px 0 0", opacity: 0.8 }}>
-              Welcome to LesBiGulfFriends. Your account has been created. Now
-              you can log in with your email and password.
+              Your account is confirmed. Now log in with your email and password.
             </p>
           </div>
         ) : null}
 
         {!seenOnboarding ? (
-          <div
-            style={{
-              marginTop: 12,
-              padding: 12,
-              borderRadius: 16,
-              border: "1px solid #efcad8",
-              background: "#fff",
-            }}
-          >
+          <div style={{ marginTop: 12, padding: 12, borderRadius: 16, border: "1px solid #efcad8", background: "#fff" }}>
             <strong>New here?</strong>
             <p style={{ margin: "8px 0 0", opacity: 0.8 }}>
-              Take the onboarding tour first so the app feels easier and more
-              exciting.
+              Take the onboarding tour first so the app feels easier and more exciting.
             </p>
             <div style={{ marginTop: 10 }}>
-              <Link href="/onboarding" className="button secondary">
-                Start onboarding
-              </Link>
+              <Link href="/onboarding" className="button secondary">Start onboarding</Link>
             </div>
           </div>
         ) : null}
@@ -100,56 +86,22 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
-            style={{
-              padding: "14px 16px",
-              borderRadius: 16,
-              border: "1px solid #d7a8bf",
-              fontSize: 16,
-              width: "100%",
-            }}
+            style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, width: "100%" }}
           />
-
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Your password"
-            style={{
-              padding: "14px 16px",
-              borderRadius: 16,
-              border: "1px solid #d7a8bf",
-              fontSize: 16,
-              width: "100%",
-            }}
+            style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, width: "100%" }}
           />
-
-          <button
-            className="button"
-            onClick={submitPassword}
-            disabled={loading || !email || !password}
-          >
+          <button className="button" onClick={submitPassword} disabled={loading || !email || !password}>
             {loading ? "Logging in..." : "Log in"}
           </button>
-
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 10,
-              flexWrap: "wrap",
-            }}
-          >
-            <Link href="/signup" style={{ fontWeight: 700, opacity: 0.8 }}>
-              Create account
-            </Link>
-            <Link
-              href="/forgot-password"
-              style={{ fontWeight: 700, opacity: 0.8 }}
-            >
-              Forgot password?
-            </Link>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <Link href="/signup" style={{ fontWeight: 700, opacity: 0.8 }}>Create account</Link>
+            <Link href="/forgot-password" style={{ fontWeight: 700, opacity: 0.8 }}>Forgot password?</Link>
           </div>
-
           {status ? <p style={{ margin: 0, opacity: 0.8 }}>{status}</p> : null}
         </div>
       </div>

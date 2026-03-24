@@ -162,6 +162,16 @@ The app is now centered on:
 
 Tina remains disabled in `package.json`.
 
+## 4.4) Verification and login flow fix
+
+This version fixes the email verification and password login flow:
+- signup verification now redirects to `/login?verified=1`
+- login no longer redirects password users to `/auth/callback`
+- password login now sends users directly to `/profile` or `/app`
+- callback no longer mentions magic links and redirects empty verification hits to login
+
+Tina remains disabled in `package.json`.
+
 ## 4) Tina setup
 
 This starter already includes a `tina/config.ts`.

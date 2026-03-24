@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabase/client";
 
 export default function AuthCallbackPage() {
-  const [message, setMessage] = useState("Signing you in...");
+  const [message, setMessage] = useState("Finishing sign-in...");
 
   useEffect(() => {
     const run = async () => {
@@ -18,14 +18,27 @@ export default function AuthCallbackPage() {
           setMessage(error.message);
           return;
         }
-        document.cookie = `lbgf_session=1; Path=/; SameSite=Lax`;
-        const hasProfile = localStorage.getItem("lbgf_profile_started") === "1";
-        window.location.href = hasProfile ? "/app" : "/profile";
-        return;
+
+        const { data: userData } = await supabase.auth.getUser();
+        document.cookie = "lbgf_session=1; Path=/; SameSite=Lax";
+
+        if (userData.user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("display_name")
+            .eq("id", userData.user.id)
+            .maybeSingle();
+
+          const hasDisplayName = !!profile?.display_name?.trim();
+          localStorage.setItem("lbgf_profile_started", hasDisplayName ? "1" : "0");
+          window.location.href = hasDisplayName ? "/app" : "/profile";
+          return;
+        }
       }
 
-      setMessage("Missing auth code. Please try the magic link again.");
+      window.location.href = "/login?verified=1";
     };
+
     run();
   }, []);
 
