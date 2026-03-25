@@ -40,11 +40,20 @@ export async function POST(request: NextRequest) {
 
     const data = await resendRes.json();
     if (!resendRes.ok) {
-      return NextResponse.json({ error: data?.message || "Unable to send invite email" }, { status: 400 });
+      console.error("Resend invite error:", data);
+      return NextResponse.json(
+        { error: data?.message || data?.error || JSON.stringify(data) || "Unable to send invite email" },
+        { status: 400 }
+      );
     }
 
-    return NextResponse.json({ ok: true, resendMessageId: data?.id || null, sentAt: new Date().toISOString() });
+    return NextResponse.json({
+      ok: true,
+      resendMessageId: data?.id || null,
+      sentAt: new Date().toISOString(),
+    });
   } catch (error) {
+    console.error("Invite send route error:", error);
     return NextResponse.json({ error: "Unable to send invite email" }, { status: 500 });
   }
 }

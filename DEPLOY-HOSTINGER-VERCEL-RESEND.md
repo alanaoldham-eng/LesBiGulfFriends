@@ -102,3 +102,36 @@ Set these environment variables:
 
 Run this migration too:
 - supabase-v047-invite-email-status-events.sql
+
+## v047.1 fixes
+This version adds:
+- ids and names on form controls across the app
+- better invite email error logging
+- Vercel daily cron retry for failed invite emails only
+
+New environment variables:
+- RESEND_API_KEY = the actual secret value for your Resend key named `invite-friend`
+- RESEND_FROM_EMAIL = onboarding@lesbigulffriends.com
+- SUPABASE_SERVICE_ROLE_KEY = required for the daily failed-invite retry job
+- CRON_SECRET = optional but recommended for protecting the cron route
+
+The browser console errors referencing:
+- chrome-extension://...
+- content.js
+- runtime.lastError
+come from a browser extension, not from your app code.
+
+## v048 invite/event status badge + karma costs
+The invite send result badge shows the current delivery state directly in the UI, such as:
+- pending
+- sent
+- failed
+- joined
+
+This version also adds:
+- cost of 1 karma point to create a group
+- cost of 1 karma point to create an event
+- +1 karma point to the inviter when an invited friend creates an account and posts an introduction in the Main group chat
+
+Run this migration too:
+- supabase-v048-karma-costs-intro-reward.sql

@@ -126,6 +126,7 @@ export async function createGroup(payload: {
   created_by: string;
   is_private?: boolean;
 }) {
+  await spendKarmaPoint(payload.created_by, "create_group");
   const { data, error } = await supabase.from("groups").insert(payload).select("*").single();
   if (error) throw error;
   const { error: e2 } = await supabase.from("group_members").insert({
@@ -248,6 +249,7 @@ export async function createEvent(payload: {
   location?: string | null;
   created_by: string;
 }) {
+  await spendKarmaPoint(payload.created_by, "create_event");
   const { data, error } = await supabase.from("events").insert(payload).select("*").single();
   if (error) throw error;
   return data;
@@ -293,5 +295,11 @@ export async function updateEventInviteStatus(eventInviteId: string, status: str
       resend_message_id: resendMessageId || null,
     })
     .eq("id", eventInviteId);
+  if (error) throw error;
+}
+
+
+export async function spendKarmaPoint(userId: string, reason: string) {
+  const { error } = await supabase.rpc("spend_karma_point", { p_user_id: userId, p_reason: reason });
   if (error) throw error;
 }

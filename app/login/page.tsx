@@ -82,6 +82,8 @@ export default function LoginPage() {
 
         <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
           <input
+            id="email"
+            name="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -89,6 +91,8 @@ export default function LoginPage() {
             style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, width: "100%" }}
           />
           <input
+            id="password"
+            name="password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

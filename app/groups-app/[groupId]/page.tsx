@@ -96,12 +96,16 @@ export default function GroupThreadPage() {
           </div>
           <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
             <textarea
+              id="message-body"
+              name="messageBody"
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder="Type a group message"
               style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
             />
             <input
+              id="link-url"
+              name="linkUrl"
               value={linkUrl}
               onChange={(e) => setLinkUrl(e.target.value)}
               placeholder="Optional link"

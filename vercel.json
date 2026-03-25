@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/retry-failed-invites",
+      "schedule": "0 14 * * *"
+    }
+  ]
+}

@@ -104,6 +104,8 @@ export default function InvitesPage() {
           <h3 style={{ marginTop: 0 }}>Send an invite</h3>
           <div style={{ display: "grid", gap: 12 }}>
             <input
+              id="invite-email"
+              name="inviteEmail"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -120,8 +122,29 @@ export default function InvitesPage() {
           {invites.length ? invites.map((inv) => (
             <div key={inv.id} style={{ padding: "10px 0", borderBottom: "1px solid #f1dfe8" }}>
               <strong>{inv.invitee_email}</strong>
-              <div style={{ opacity: 0.8, marginTop: 4 }}>Status: {inv.status}</div>
-              {inv.error_message ? <div style={{ opacity: 0.7, marginTop: 4 }}>Error: {inv.error_message}</div> : null}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6, alignItems: "center" }}>
+                <span style={{
+                  display: "inline-flex",
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                  fontSize: 12,
+                  fontWeight: 800,
+                  background:
+                    inv.status === "sent" ? "#e8f7ee" :
+                    inv.status === "joined" ? "#e8f0ff" :
+                    inv.status === "failed" ? "#ffe9ea" : "#f4edf1",
+                  color:
+                    inv.status === "sent" ? "#1e7a43" :
+                    inv.status === "joined" ? "#355cde" :
+                    inv.status === "failed" ? "#b42318" : "#6b4b5c"
+                }}>
+                  {inv.status}
+                </span>
+                {inv.sent_at ? <span style={{ opacity: 0.75, fontSize: 13 }}>Sent: {new Date(inv.sent_at).toLocaleString()}</span> : null}
+                {inv.joined_at ? <span style={{ opacity: 0.75, fontSize: 13 }}>Joined: {new Date(inv.joined_at).toLocaleString()}</span> : null}
+                {inv.intro_rewarded_at ? <span style={{ opacity: 0.75, fontSize: 13 }}>Intro reward earned</span> : null}
+              </div>
+              {inv.error_message ? <div style={{ opacity: 0.7, marginTop: 6 }}>Error: {inv.error_message}</div> : null}
               {(inv.status === "failed" || inv.status === "pending") ? (
                 <div style={{ marginTop: 8 }}>
                   <button className="button secondary" onClick={() => retryInvite(inv.id, inv.invitee_email)}>Retry send</button>

@@ -114,7 +114,7 @@ export default function EventsAppPage() {
       <section className="hero">
         <h1 style={{ margin: 0, fontSize: 30 }}>Events</h1>
         <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
-          Create events and invite people by email.
+          Create events and invite people by email. Creating an event costs 1 karma point.
         </p>
       </section>
 
@@ -124,7 +124,7 @@ export default function EventsAppPage() {
           <div style={{ display: "grid", gap: 12 }}>
             <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title"
               style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description"
+            <textarea id="group-description" name="groupDescription" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description"
               style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
             <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)}
               style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
@@ -165,8 +165,28 @@ export default function EventsAppPage() {
               {eventInvites.length ? eventInvites.map((row) => (
                 <div key={row.id} style={{ borderBottom: "1px solid #f1dfe8", padding: "10px 0" }}>
                   <strong>{row.invitee_email}</strong>
-                  <div style={{ opacity: 0.8 }}>Status: {row.status}</div>
-                  {row.error_message ? <div style={{ opacity: 0.7 }}>Error: {row.error_message}</div> : null}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6, alignItems: "center" }}>
+                    <span style={{
+                      display: "inline-flex",
+                      padding: "4px 10px",
+                      borderRadius: 999,
+                      fontSize: 12,
+                      fontWeight: 800,
+                      background:
+                        row.status === "sent" ? "#e8f7ee" :
+                        row.status === "joined" ? "#e8f0ff" :
+                        row.status === "failed" ? "#ffe9ea" : "#f4edf1",
+                      color:
+                        row.status === "sent" ? "#1e7a43" :
+                        row.status === "joined" ? "#355cde" :
+                        row.status === "failed" ? "#b42318" : "#6b4b5c"
+                    }}>
+                      {row.status}
+                    </span>
+                    {row.sent_at ? <span style={{ opacity: 0.75, fontSize: 13 }}>Sent: {new Date(row.sent_at).toLocaleString()}</span> : null}
+                    {row.joined_at ? <span style={{ opacity: 0.75, fontSize: 13 }}>Joined: {new Date(row.joined_at).toLocaleString()}</span> : null}
+                  </div>
+                  {row.error_message ? <div style={{ opacity: 0.7, marginTop: 6 }}>Error: {row.error_message}</div> : null}
                   {(row.status === "failed" || row.status === "pending") ? (
                     <div style={{ marginTop: 8 }}>
                       <button className="button secondary" onClick={() => retryEventInvite(row)}>Retry send</button>

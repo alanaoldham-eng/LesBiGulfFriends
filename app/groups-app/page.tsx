@@ -83,13 +83,13 @@ export default function GroupsAppPage() {
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <h3 style={{ marginTop: 0 }}>Create a group</h3>
           <div style={{ display: "grid", gap: 12 }}>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Group name"
+            <input id="group-name" name="groupName" value={name} onChange={(e) => setName(e.target.value)} placeholder="Group name"
               style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description"
+            <textarea id="group-description" name="groupDescription" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description"
               style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-            <input value={locationTag} onChange={(e) => setLocationTag(e.target.value)} placeholder="Location tag"
+            <input id="group-location-tag" name="locationTag" value={locationTag} onChange={(e) => setLocationTag(e.target.value)} placeholder="Location tag"
               style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-            <input value={interestTags} onChange={(e) => setInterestTags(e.target.value)} placeholder="Interest tags (comma separated)"
+            <input id="group-interest-tags" name="interestTags" value={interestTags} onChange={(e) => setInterestTags(e.target.value)} placeholder="Interest tags (comma separated)"
               style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
             <button className="button" onClick={doCreate} disabled={!me || !name}>Create group</button>
           </div>

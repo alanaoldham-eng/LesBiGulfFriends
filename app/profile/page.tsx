@@ -126,30 +126,40 @@ export default function ProfilePage() {
           <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
             <div style={{ display: "grid", gap: 12 }}>
               <input
+                id="display-name"
+                name="displayName"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Nickname or display name"
                 style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
               />
               <textarea
+                id="bio"
+                name="bio"
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 placeholder="Bio"
                 style={{ minHeight: 120, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
               />
               <input
+                id="interests"
+                name="interests"
                 value={interests}
                 onChange={(e) => setInterests(e.target.value)}
                 placeholder="Interests (comma separated)"
                 style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
               />
               <input
+                id="city"
+                name="city"
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
                 placeholder="City"
                 style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
               />
               <select
+                id="relationship-status"
+                name="relationshipStatus"
                 value={relationshipStatus}
                 onChange={(e) => setRelationshipStatus(e.target.value as RelationshipStatus | "")}
                 style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, background: "#fff" }}
