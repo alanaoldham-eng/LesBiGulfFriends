@@ -383,13 +383,19 @@ export async function listPublicGroups() {
 }
 
 export async function getPublicAndMemberGroups(userId: string) {
-  const [publicGroups, myGroups] = await Promise.all([
-    listPublicGroups().catch(() => []),
-    listMyGroups(userId).catch(() => []),
-  ]);
-  const map = new Map<string, any>();
-  [...publicGroups, ...myGroups].forEach((g: any) => map.set(g.id, g));
-  return Array.from(map.values()).sort((a: any, b: any) => (a.created_at < b.created_at ? 1 : -1));
+  const { data, error } = await supabase
+    .from("groups")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (error) throw error;
+
+  // RLS should already prevent unauthorized private groups from coming back.
+  // This keeps public groups visible and also keeps any groups the user owns/matches.
+  return (data || []).filter((g: any) => {
+    return g.is_private === false || g.is_private === null || g.created_by === userId;
+  });
 }
 
 export async function getFriendIds(me: string): Promise<Set<string>> {
