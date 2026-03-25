@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Heart } from "lucide-react";
+
 
 export function CTA() {
   return (
@@ -14,7 +14,7 @@ export function CTA() {
 
           <div className="relative">
             <div className="mb-6 inline-flex items-center justify-center rounded-full bg-white/20 p-4 backdrop-blur-sm">
-              <Heart className="h-8 w-8 text-white" fill="currentColor" />
+              <span aria-hidden="true">💖</span>
             </div>
 
             <h2 className="mb-4 font-[family-name:var(--font-display)] text-2xl font-bold text-white md:text-4xl">
