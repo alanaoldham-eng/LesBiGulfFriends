@@ -340,3 +340,17 @@ This version also adds:
 
 Run this migration too:
 - supabase-v048-karma-costs-intro-reward.sql
+
+## v049 invite FK + trigger hardening
+This version fixes the database error:
+- `insert or update on table "invites" violates foreign key constraint "invites_invitee_user_id_fkey"`
+
+Changes:
+- `invites.invitee_user_id` now references `auth.users(id)` instead of `profiles(id)`
+- `event_invites.invitee_user_id` now references `auth.users(id)` too
+- invite join triggers are hardened
+- friendship creation is backfilled when the profile row appears
+- existing joined invites are backfilled into friendships
+
+Run this migration too:
+- `supabase-v049-invite-fk-and-trigger-hardening.sql`
