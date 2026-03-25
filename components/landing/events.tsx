@@ -1,14 +1,13 @@
 "use client";
 
-import { Calendar, MapPin, Users, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 const upcomingEvents = [
   {
-    title: "Spring Beach Bonfire",
-    date: "April 12, 2026",
-    time: "6:00 PM",
-    location: "Gulf Shores, AL",
+    title: "Spring Beach Party",
+    date: "May 18, 2026",
+    time: "11:00 AM",
+    location: "Gulfport, MS",
     attendees: 18,
     type: "In-person",
   },
@@ -24,7 +23,7 @@ const upcomingEvents = [
     title: "Brunch & Books",
     date: "April 20, 2026",
     time: "11:00 AM",
-    location: "Mobile, AL",
+    location: "New Orleans, LA",
     attendees: 12,
     type: "In-person",
   },
@@ -53,7 +52,7 @@ export function Events() {
             className="inline-flex items-center gap-2 text-sm font-semibold text-sunset transition-colors hover:text-wine"
           >
             View all events
-            <ArrowRight className="h-4 w-4" />
+            <span>→</span>
           </Link>
         </div>
 
@@ -94,15 +93,15 @@ export function Events() {
                     </div>
                     <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
-                        <Calendar className="h-3.5 w-3.5" />
+                        <span>📅</span>
                         {event.time}
                       </span>
                       <span className="flex items-center gap-1">
-                        <MapPin className="h-3.5 w-3.5" />
+                        <span>📍</span>
                         {event.location}
                       </span>
                       <span className="flex items-center gap-1">
-                        <Users className="h-3.5 w-3.5" />
+                        <span>👥</span>
                         {event.attendees} attending
                       </span>
                     </div>

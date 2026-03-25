@@ -1,31 +1,29 @@
 "use client";
 
-import { UserPlus, Users, MessageSquare, PartyPopper } from "lucide-react";
-
 const steps = [
   {
-    icon: UserPlus,
+    icon: "➕👤",
     step: "01",
     title: "Create your profile",
     description:
       "Sign up and customize your profile. Choose a display name to keep your email private.",
   },
   {
-    icon: Users,
+    icon: "👥",
     step: "02",
     title: "Make friends first",
     description:
       "Browse profiles and send friend requests. Conversations start with mutual consent.",
   },
   {
-    icon: MessageSquare,
+    icon: "💬",
     step: "03",
     title: "Start chatting",
     description:
       "Once you're friends, direct messages unlock. Chat privately and build real connections.",
   },
   {
-    icon: PartyPopper,
+    icon: "🎉",
     step: "04",
     title: "Join the community",
     description:
@@ -37,7 +35,6 @@ export function HowItWorks() {
   return (
     <section className="bg-cream py-12 md:py-20">
       <div className="container-app">
-        {/* Section Header */}
         <div className="mb-10 text-center md:mb-14">
           <span className="mb-3 inline-block rounded-full bg-blush px-4 py-1.5 text-sm font-semibold text-wine">
             Getting Started
@@ -46,25 +43,24 @@ export function HowItWorks() {
             How it works
           </h2>
           <p className="mx-auto max-w-2xl text-pretty text-muted-foreground">
-            Joining our community is simple and safe. Here's what happens after
+            Joining our community is simple and safe. Here&apos;s what happens after
             you sign up.
           </p>
         </div>
 
-        {/* Steps */}
         <div className="grid gap-6 md:grid-cols-4">
           {steps.map((item, index) => (
             <div key={item.step} className="relative">
-              {/* Connector line */}
               {index < steps.length - 1 && (
                 <div className="absolute left-1/2 top-12 hidden h-0.5 w-full bg-gradient-to-r from-coral to-blush md:block" />
               )}
 
               <div className="relative flex flex-col items-center text-center">
-                {/* Step number badge */}
                 <div className="relative mb-4">
                   <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-coral to-sunset text-white shadow-lg shadow-sunset/25 md:h-20 md:w-20">
-                    <item.icon className="h-8 w-8 md:h-10 md:w-10" strokeWidth={1.5} />
+                    <span aria-hidden="true" className="text-3xl leading-none md:text-4xl">
+                      {item.icon}
+                    </span>
                   </div>
                   <span className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-wine text-xs font-bold text-white">
                     {item.step}

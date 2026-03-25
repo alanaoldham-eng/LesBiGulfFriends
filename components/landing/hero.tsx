@@ -2,17 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Shield, MessageCircle, Users } from "lucide-react";
 
 export function Hero() {
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-cream to-background pb-12 pt-6 md:pb-20 md:pt-10">
-      {/* Decorative gradient orbs */}
       <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-coral/30 blur-3xl" />
       <div className="pointer-events-none absolute -left-20 top-40 h-48 w-48 rounded-full bg-blush/40 blur-3xl" />
-      
+
       <div className="container-app relative">
-        {/* Logo & Brand */}
         <div className="mb-8 flex items-center gap-3 md:mb-12">
           <Image
             src="/logo.png"
@@ -32,9 +29,7 @@ export function Hero() {
           </div>
         </div>
 
-        {/* Hero Card */}
         <div className="rounded-3xl border border-border bg-card p-6 shadow-xl shadow-coral/10 md:p-10">
-          {/* Status Badge */}
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-coral/30 bg-blush/50 px-4 py-2">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sunset opacity-75" />
@@ -45,7 +40,6 @@ export function Hero() {
             </span>
           </div>
 
-          {/* Main Headline */}
           <h2 className="mb-4 text-balance font-[family-name:var(--font-display)] text-3xl font-bold leading-tight tracking-tight text-foreground md:text-5xl md:leading-tight">
             Your safe space to connect with{" "}
             <span className="text-sunset">like-minded women</span> on the Gulf Coast
@@ -57,7 +51,6 @@ export function Hero() {
             bisexual women who share your interests and values.
           </p>
 
-          {/* CTA Buttons */}
           <div className="mb-8 flex flex-wrap gap-3">
             <Link
               href="/signup"
@@ -73,23 +66,22 @@ export function Hero() {
             </Link>
           </div>
 
-          {/* Trust Indicators */}
           <div className="flex flex-wrap gap-4 text-sm font-medium text-foreground/80 md:gap-6">
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blush">
-                <MessageCircle className="h-4 w-4 text-wine" />
+                <span aria-hidden="true" className="text-base leading-none text-wine">💬</span>
               </div>
               <span>Friends-first chat</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blush">
-                <Shield className="h-4 w-4 text-wine" />
+                <span aria-hidden="true" className="text-base leading-none text-wine">🛡️</span>
               </div>
               <span>Safety-minded</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blush">
-                <Users className="h-4 w-4 text-wine" />
+                <span aria-hidden="true" className="text-base leading-none text-wine">👥</span>
               </div>
               <span>Gulf Coast locals</span>
             </div>
