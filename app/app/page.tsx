@@ -4,24 +4,27 @@ export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
 import { ClientShell } from "../../components/ClientShell";
 import { getCurrentUser } from "../../lib/auth";
-import { listFriends, listMyGroups } from "../../lib/db";
+import { listFriends, listMyGroups, getMyProfile } from "../../lib/db";
 
 export default function AppHomePage() {
   const [name, setName] = useState("member");
   const [friendCount, setFriendCount] = useState(0);
   const [groupCount, setGroupCount] = useState(0);
+  const [karmaPoints, setKarmaPoints] = useState(0);
 
   useEffect(() => {
     const run = async () => {
       const user = await getCurrentUser();
       if (!user) return;
-      const [friends, groups] = await Promise.all([
+      const [friends, groups, profile] = await Promise.all([
         listFriends(user.id).catch(() => []),
         listMyGroups(user.id).catch(() => []),
+        getMyProfile(user.id).catch(() => null),
       ]);
       setFriendCount(friends.length);
       setGroupCount(groups.length);
-      setName(user.email?.split("@")[0] || "member");
+      setName(profile?.display_name || user.email?.split("@")[0] || "member");
+      setKarmaPoints(Number(profile?.karma_points || 0));
     };
     run();
   }, []);
@@ -40,6 +43,7 @@ export default function AppHomePage() {
           <ul style={{ lineHeight: 1.8, paddingLeft: 18, marginBottom: 0 }}>
             <li>{friendCount} friends</li>
             <li>{groupCount} groups</li>
+            <li>{karmaPoints} karma points</li>
             <li>Next step: wire events/check-ins after this MVP feels stable</li>
           </ul>
         </section>

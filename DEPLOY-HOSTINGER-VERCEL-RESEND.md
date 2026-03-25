@@ -149,3 +149,14 @@ Changes:
 
 Run this migration too:
 - `supabase-v049-invite-fk-and-trigger-hardening.sql`
+
+## v050 onboarding, karma visibility, private groups, and moderation
+This version adds:
+- onboarding no longer mentions magic links
+- group/event creation actions are hidden when a member has 0 karma
+- groups now clearly mention the 1 karma point creation cost
+- private groups are now supported
+- group owners/moderators can view members, promote moderators, and remove members
+
+Run this migration too:
+- `supabase-v050-private-groups-moderation.sql`

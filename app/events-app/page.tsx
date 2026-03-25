@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import { ClientShell } from "../../components/ClientShell";
+import { EmptyState } from "../../components/EmptyState";
 import { getCurrentUser } from "../../lib/auth";
 import { createEvent, listMyEvents, createEventInvite, listEventInvites, getMyProfile, updateEventInviteStatus } from "../../lib/db";
 
@@ -18,6 +19,7 @@ export default function EventsAppPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [eventInvites, setEventInvites] = useState<any[]>([]);
   const [status, setStatus] = useState("");
+  const [karmaPoints, setKarmaPoints] = useState(0);
 
   const refreshEvents = async (uid: string) => {
     const rows = await listMyEvents(uid).catch(() => []);
@@ -35,6 +37,7 @@ export default function EventsAppPage() {
       setMe(user.id);
       const profile = await getMyProfile(user.id).catch(() => null);
       setDisplayName(profile?.display_name || "A member");
+      setKarmaPoints(Number(profile?.karma_points || 0));
       await refreshEvents(user.id);
     };
     run();
@@ -119,20 +122,26 @@ export default function EventsAppPage() {
       </section>
 
       <div className="grid">
-        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
-          <h3 style={{ marginTop: 0 }}>Create event</h3>
-          <div style={{ display: "grid", gap: 12 }}>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title"
-              style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-            <textarea id="group-description" name="groupDescription" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description"
-              style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-            <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)}
-              style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-            <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location"
-              style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-            <button className="button" onClick={create} disabled={!me || !title || !startsAt}>Create event</button>
-          </div>
-        </section>
+        
+<section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
+  <h3 style={{ marginTop: 0 }}>Create event</h3>
+  {karmaPoints > 0 ? (
+    <div style={{ display: "grid", gap: 12 }}>
+      <input id="event-title" name="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title"
+        style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+      <textarea id="event-description" name="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description"
+        style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+      <input id="event-starts-at" name="startsAt" type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)}
+        style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+      <input id="event-location" name="location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location"
+        style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+      <div style={{ opacity: 0.75 }}>Karma available: {karmaPoints}</div>
+      <button className="button" onClick={create} disabled={!me || !title || !startsAt}>Create event</button>
+    </div>
+  ) : (
+    <EmptyState title="Need 1 karma point" body="Creating an event costs 1 karma point. Earn karma by inviting a friend who joins and posts an introduction in Main." />
+  )}
+</section>
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <h3 style={{ marginTop: 0 }}>Your events</h3>

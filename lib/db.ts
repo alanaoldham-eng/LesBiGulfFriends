@@ -231,6 +231,71 @@ export async function updateInviteStatus(inviteId: string, status: string, sentA
   if (error) throw error;
 }
 
+
+
+export async function getAccessibleGroups(userId: string) {
+  const { data, error } = await supabase
+    .from("groups")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getGroupById(groupId: string) {
+  const { data, error } = await supabase.from("groups").select("*").eq("id", groupId).single();
+  if (error) throw error;
+  return data;
+}
+
+export async function getMyGroupMembership(groupId: string, userId: string) {
+  const { data, error } = await supabase
+    .from("group_members")
+    .select("*")
+    .eq("group_id", groupId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function listGroupMembers(groupId: string) {
+  const { data: memberships, error } = await supabase
+    .from("group_members")
+    .select("*")
+    .eq("group_id", groupId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  const userIds = (memberships || []).map((m: any) => m.user_id);
+  let profiles: any[] = [];
+  if (userIds.length) {
+    const { data: profs, error: pe } = await supabase.from("profiles").select("id, display_name, photo_url, photo_urls").in("id", userIds);
+    if (pe) throw pe;
+    profiles = profs || [];
+  }
+  const profileMap = new Map(profiles.map((p: any) => [p.id, p]));
+  return (memberships || []).map((m: any) => ({ ...m, profile: profileMap.get(m.user_id) || null }));
+}
+
+export async function updateGroupMemberRole(groupId: string, userId: string, role: "member" | "mod") {
+  const { error } = await supabase
+    .from("group_members")
+    .update({ role })
+    .eq("group_id", groupId)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
+export async function removeGroupMember(groupId: string, userId: string) {
+  const { error } = await supabase
+    .from("group_members")
+    .delete()
+    .eq("group_id", groupId)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
 export async function getMainGroupId() {
   const { data, error } = await supabase
     .from("groups")

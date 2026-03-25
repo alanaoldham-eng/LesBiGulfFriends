@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ClientShell } from "../../../components/ClientShell";
 import { getCurrentUser } from "../../../lib/auth";
-import { listGroupMessages, sendGroupMessage, uploadPublicImage } from "../../../lib/db";
+import { getGroupById, getMyGroupMembership, listGroupMembers, listGroupMessages, removeGroupMember, sendGroupMessage, updateGroupMemberRole, uploadPublicImage } from "../../../lib/db";
 
 function ChatAttachment({ m, isMe }: { m: any; isMe: boolean }) {
   return (
@@ -38,15 +38,29 @@ export default function GroupThreadPage() {
   const params = useParams<{ groupId: string }>();
   const groupId = params.groupId;
   const [me, setMe] = useState("");
+  const [group, setGroup] = useState<any | null>(null);
+  const [membership, setMembership] = useState<any | null>(null);
+  const [members, setMembers] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
   const [body, setBody] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
   const [status, setStatus] = useState("");
 
-  const refresh = async () => {
-    const rows = await listGroupMessages(groupId).catch(() => []);
-    setMessages(rows);
+  const canModerate = membership?.role === "owner" || membership?.role === "mod";
+  const isOwner = membership?.role === "owner";
+
+  const refresh = async (uid: string) => {
+    const [groupRow, membershipRow, memberRows, messageRows] = await Promise.all([
+      getGroupById(groupId).catch(() => null),
+      getMyGroupMembership(groupId, uid).catch(() => null),
+      listGroupMembers(groupId).catch(() => []),
+      listGroupMessages(groupId).catch(() => []),
+    ]);
+    setGroup(groupRow);
+    setMembership(membershipRow);
+    setMembers(memberRows);
+    setMessages(messageRows);
   };
 
   useEffect(() => {
@@ -54,7 +68,7 @@ export default function GroupThreadPage() {
       const user = await getCurrentUser();
       if (!user) return;
       setMe(user.id);
-      await refresh();
+      await refresh(user.id);
     };
     run();
   }, [groupId]);
@@ -72,18 +86,48 @@ export default function GroupThreadPage() {
       setBody("");
       setLinkUrl("");
       setAttachment(null);
-      await refresh();
+      await refresh(me);
     } catch (e: any) {
       setStatus(e.message || "Unable to send group message.");
+    }
+  };
+
+  const promoteToMod = async (userId: string) => {
+    try {
+      await updateGroupMemberRole(groupId, userId, "mod");
+      setStatus("Member promoted to moderator.");
+      await refresh(me);
+    } catch (e: any) {
+      setStatus(e.message || "Unable to update role.");
+    }
+  };
+
+  const demoteToMember = async (userId: string) => {
+    try {
+      await updateGroupMemberRole(groupId, userId, "member");
+      setStatus("Moderator changed to member.");
+      await refresh(me);
+    } catch (e: any) {
+      setStatus(e.message || "Unable to update role.");
+    }
+  };
+
+  const removeMemberFromGroup = async (userId: string) => {
+    try {
+      await removeGroupMember(groupId, userId);
+      setStatus("Member removed.");
+      await refresh(me);
+    } catch (e: any) {
+      setStatus(e.message || "Unable to remove member.");
     }
   };
 
   return (
     <ClientShell>
       <section className="hero">
-        <h1 style={{ margin: 0, fontSize: 30 }}>Group chat</h1>
+        <h1 style={{ margin: 0, fontSize: 30 }}>{group?.name || "Group"}</h1>
         <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
-          Send text, pictures, and links in your groups.
+          {group?.is_private ? "Private group." : "Public group."} Send text, pictures, and links in your groups.
         </p>
       </section>
 
@@ -111,11 +155,34 @@ export default function GroupThreadPage() {
               placeholder="Optional link"
               style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
             />
-            <input type="file" accept="image/*,.pdf,.doc,.docx,.txt,.zip" onChange={(e) => setAttachment(e.target.files?.[0] || null)} />
+            <input id="group-attachment" name="groupAttachment" type="file" accept="image/*,.pdf,.doc,.docx,.txt,.zip" onChange={(e) => setAttachment(e.target.files?.[0] || null)} />
             <button className="button" onClick={send}>Send to group</button>
-            {status ? <p style={{ margin: 0, opacity: 0.8 }}>{status}</p> : null}
           </div>
         </section>
+
+        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
+          <h3 style={{ marginTop: 0 }}>Members</h3>
+          {members.map((m) => (
+            <div key={m.user_id} style={{ borderBottom: "1px solid #f1dfe8", padding: "10px 0" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                <div>
+                  <strong>{m.profile?.display_name || m.user_id}</strong>
+                  <div style={{ opacity: 0.75 }}>{m.role}</div>
+                </div>
+                {canModerate && m.user_id !== me ? (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {isOwner && m.role === "member" ? <button className="button secondary" onClick={() => promoteToMod(m.user_id)}>Make mod</button> : null}
+                    {isOwner && m.role === "mod" ? <button className="button secondary" onClick={() => demoteToMember(m.user_id)}>Make member</button> : null}
+                    {(isOwner || (membership?.role === "mod" && m.role === "member")) ? <button className="button secondary" onClick={() => removeMemberFromGroup(m.user_id)}>Remove</button> : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ))}
+          {!members.length ? <p style={{ margin: 0, opacity: 0.75 }}>No members yet.</p> : null}
+        </section>
+
+        {status ? <p style={{ margin: 0, opacity: 0.8 }}>{status}</p> : null}
       </div>
     </ClientShell>
   );

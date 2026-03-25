@@ -21,7 +21,7 @@ const STEPS = [
   },
   {
     title: "Ready to begin?",
-    body: "Sign in with a magic link, create your profile, and take the first step into the community.",
+    body: "Create your account, log in with your email and password, and take the first step into the community.",
     emoji: "✨",
   },
 ];
