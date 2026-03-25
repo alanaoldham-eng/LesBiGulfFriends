@@ -87,3 +87,18 @@ Buckets used:
 
 The included SQL migration creates both buckets and the basic policies:
 - `supabase-v045-photo-main-group-attachments.sql`
+
+## v047 invite email sending + events
+This version adds:
+- server-side invite email API route using Resend
+- invite status updates: pending / sent / failed / joined
+- retry-send button on the invites page
+- events and event invites with email sending
+- server-side event invite email API route using Resend
+
+Set these environment variables:
+- RESEND_API_KEY=your Resend API key (you said the key is named `invite-friend` in Resend)
+- RESEND_FROM_EMAIL=onboarding@lesbigulffriends.com
+
+Run this migration too:
+- supabase-v047-invite-email-status-events.sql

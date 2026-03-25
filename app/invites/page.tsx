@@ -8,6 +8,7 @@ import { createInvite, listMyInvites, getMyProfile } from "../../lib/db";
 
 export default function InvitesPage() {
   const [me, setMe] = useState("");
+  const [inviterName, setInviterName] = useState("A friend");
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState("");
   const [invites, setInvites] = useState<any[]>([]);
@@ -20,6 +21,7 @@ export default function InvitesPage() {
     ]);
     setInvites(rows);
     setKarma(Number(profile?.karma_points || 0));
+    setInviterName(profile?.display_name || "A friend");
   };
 
   useEffect(() => {
@@ -32,15 +34,54 @@ export default function InvitesPage() {
     run();
   }, []);
 
+  const sendInviteEmail = async (inviteId: string, inviteeEmail: string) => {
+    const res = await fetch("/api/invites/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inviteeEmail, inviterName }),
+    });
+    const data = await res.json();
+    return { ok: res.ok, ...data };
+  };
+
   const submit = async () => {
     if (!email.trim()) return;
     try {
-      await createInvite(me, email.trim());
+      const invite = await createInvite(me, email.trim());
+      const sendResult = await sendInviteEmail(invite.id, email.trim());
+
+      if (!sendResult.ok) {
+        const { updateInviteStatus } = await import("../../lib/db");
+        await updateInviteStatus(invite.id, "failed", null, sendResult.error || "Unable to send email", null);
+        setStatus(sendResult.error || "Invite created, but email failed to send.");
+      } else {
+        const { updateInviteStatus } = await import("../../lib/db");
+        await updateInviteStatus(invite.id, "sent", sendResult.sentAt, null, sendResult.resendMessageId || null);
+        setStatus("Invitation email sent.");
+      }
+
       setEmail("");
-      setStatus("Invitation recorded. When your friend signs up with that email, the friendship and karma will be created automatically.");
       await refresh(me);
     } catch (e: any) {
       setStatus(e.message || "Unable to create invite.");
+    }
+  };
+
+  const retryInvite = async (inviteId: string, inviteeEmail: string) => {
+    try {
+      setStatus("Retrying invite...");
+      const sendResult = await sendInviteEmail(inviteId, inviteeEmail);
+      const { updateInviteStatus } = await import("../../lib/db");
+      if (!sendResult.ok) {
+        await updateInviteStatus(inviteId, "failed", null, sendResult.error || "Unable to send email", null);
+        setStatus(sendResult.error || "Retry failed.");
+      } else {
+        await updateInviteStatus(inviteId, "sent", sendResult.sentAt, null, sendResult.resendMessageId || null);
+        setStatus("Invite email sent.");
+      }
+      await refresh(me);
+    } catch (e: any) {
+      setStatus(e.message || "Retry failed.");
     }
   };
 
@@ -79,7 +120,13 @@ export default function InvitesPage() {
           {invites.length ? invites.map((inv) => (
             <div key={inv.id} style={{ padding: "10px 0", borderBottom: "1px solid #f1dfe8" }}>
               <strong>{inv.invitee_email}</strong>
-              <div style={{ opacity: 0.8 }}>Status: {inv.status}</div>
+              <div style={{ opacity: 0.8, marginTop: 4 }}>Status: {inv.status}</div>
+              {inv.error_message ? <div style={{ opacity: 0.7, marginTop: 4 }}>Error: {inv.error_message}</div> : null}
+              {(inv.status === "failed" || inv.status === "pending") ? (
+                <div style={{ marginTop: 8 }}>
+                  <button className="button secondary" onClick={() => retryInvite(inv.id, inv.invitee_email)}>Retry send</button>
+                </div>
+              ) : null}
             </div>
           )) : <p style={{ margin: 0, opacity: 0.8 }}>No invites yet.</p>}
         </section>

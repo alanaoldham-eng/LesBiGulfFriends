@@ -197,7 +197,6 @@ export async function deletePublicImage(bucket: "profile-photos" | "chat-media",
   await supabase.storage.from(bucket).remove([path]);
 }
 
-
 export async function createInvite(inviter_id: string, invitee_email: string) {
   const { data, error } = await supabase
     .from("invites")
@@ -218,6 +217,19 @@ export async function listMyInvites(inviter_id: string) {
   return data || [];
 }
 
+export async function updateInviteStatus(inviteId: string, status: string, sentAt?: string | null, errorMessage?: string | null, resendMessageId?: string | null) {
+  const { error } = await supabase
+    .from("invites")
+    .update({
+      status,
+      sent_at: sentAt || null,
+      error_message: errorMessage || null,
+      resend_message_id: resendMessageId || null,
+    })
+    .eq("id", inviteId);
+  if (error) throw error;
+}
+
 export async function getMainGroupId() {
   const { data, error } = await supabase
     .from("groups")
@@ -227,4 +239,59 @@ export async function getMainGroupId() {
     .maybeSingle();
   if (error) throw error;
   return data?.id || null;
+}
+
+export async function createEvent(payload: {
+  title: string;
+  description?: string | null;
+  starts_at: string;
+  location?: string | null;
+  created_by: string;
+}) {
+  const { data, error } = await supabase.from("events").insert(payload).select("*").single();
+  if (error) throw error;
+  return data;
+}
+
+export async function listMyEvents(created_by: string) {
+  const { data, error } = await supabase
+    .from("events")
+    .select("*")
+    .eq("created_by", created_by)
+    .order("starts_at", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createEventInvite(event_id: string, inviter_id: string, invitee_email: string) {
+  const { data, error } = await supabase
+    .from("event_invites")
+    .insert({ event_id, inviter_id, invitee_email: invitee_email.toLowerCase(), status: "pending" })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function listEventInvites(event_id: string) {
+  const { data, error } = await supabase
+    .from("event_invites")
+    .select("*")
+    .eq("event_id", event_id)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function updateEventInviteStatus(eventInviteId: string, status: string, sentAt?: string | null, errorMessage?: string | null, resendMessageId?: string | null) {
+  const { error } = await supabase
+    .from("event_invites")
+    .update({
+      status,
+      sent_at: sentAt || null,
+      error_message: errorMessage || null,
+      resend_message_id: resendMessageId || null,
+    })
+    .eq("id", eventInviteId);
+  if (error) throw error;
 }

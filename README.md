@@ -292,3 +292,18 @@ Content locations:
 ## 10) Recommended next prompt for v0
 
 > Build a mobile-first women-centered community web app homepage for Les Bi Gulf Friends in Next.js App Router. Use a warm lesbian-flag-inspired palette, soft rounded cards, strong typography, and a premium but welcoming feel. Include sections for community values, groups, events, and privacy. Keep it easy to integrate into an existing Next.js + Tina + Supabase project.
+
+## v047 invite email sending + events
+This version adds:
+- server-side invite email API route using Resend
+- invite status updates: pending / sent / failed / joined
+- retry-send button on the invites page
+- events and event invites with email sending
+- server-side event invite email API route using Resend
+
+Set these environment variables:
+- RESEND_API_KEY=your Resend API key (you said the key is named `invite-friend` in Resend)
+- RESEND_FROM_EMAIL=onboarding@lesbigulffriends.com
+
+Run this migration too:
+- supabase-v047-invite-email-status-events.sql
