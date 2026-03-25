@@ -49,7 +49,7 @@ function MessageCard({ m, me, friendIds, onAddFriend, onReply, onReact }: any) {
             </div>
           ) : null}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
-            <button className="button secondary" onClick={() => onReply(m.id)}>Reply</button>
+            <button type="button" className="button secondary" onClick={() => onReply(String(m.id))}>Reply</button>
             {EMOJIS.map((emoji) => (
               <button key={emoji} className="button secondary" onClick={() => onReact(m.id, emoji)}>{emoji} {grouped.get(emoji) || ""}</button>
             ))}
@@ -73,6 +73,7 @@ export default function GroupThreadPage() {
   const [linkUrl, setLinkUrl] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [replyPreview, setReplyPreview] = useState<any | null>(null);
   const [status, setStatus] = useState("");
 
   const canModerate = membership?.role === "owner" || membership?.role === "mod";
@@ -84,13 +85,13 @@ export default function GroupThreadPage() {
       getMyGroupMembership(groupId, uid).catch(() => null),
       listGroupMembers(groupId).catch(() => []),
       listGroupMessagesDetailed(groupId).catch(() => []),
-      getFriendIds(uid).catch(() => new Set<string>()),
+      getFriendIds(uid).catch(() => new Set()),
     ]);
     setGroup(groupRow);
     setMembership(membershipRow);
     setMembers(memberRows);
     setMessages(messageRows);
-    setFriendIds(fids);
+    setFriendIds(fids as Set<string>);
   };
 
   useEffect(() => {
@@ -102,6 +103,13 @@ export default function GroupThreadPage() {
     };
     run();
   }, [groupId]);
+
+  const handleReply = (messageId: string) => {
+    setReplyTo(messageId);
+    const msg = messages.find((m: any) => String(m.id) === String(messageId)) || null;
+    setReplyPreview(msg);
+    setStatus("Reply attached.");
+  };
 
   const send = async () => {
     if (!body.trim() && !linkUrl.trim() && !attachment) return;
@@ -117,6 +125,7 @@ export default function GroupThreadPage() {
       setLinkUrl("");
       setAttachment(null);
       setReplyTo(null);
+      setReplyPreview(null);
       await refresh(me);
     } catch (e: any) {
       setStatus(e.message || "Unable to send group message.");
@@ -158,11 +167,11 @@ export default function GroupThreadPage() {
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <div style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, minHeight: 220, background: "#fffafc" }}>
             {messages.length ? messages.map((m) => (
-              <MessageCard key={m.id} m={m} me={me} friendIds={friendIds} onAddFriend={addFriend} onReply={setReplyTo} onReact={react} />
+              <MessageCard key={m.id} m={m} me={me} friendIds={friendIds} onAddFriend={addFriend} onReply={handleReply} onReact={react} />
             )) : <p style={{ margin: 0, opacity: 0.7 }}>No group messages yet.</p>}
           </div>
           <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-            {replyTo ? <div style={{ opacity: 0.75 }}>Replying to message <code>{replyTo.slice(0, 8)}</code> <button className="button secondary" onClick={() => setReplyTo(null)}>Clear reply</button></div> : null}
+            {replyTo ? <div style={{ opacity: 0.85, border: "1px solid #f1dfe8", borderRadius: 14, padding: 10, background: "#fffafc" }}>Replying to <strong>{replyPreview?.profile?.display_name || (replyPreview?.sender_id === me ? "You" : "member")}</strong>{replyPreview?.body ? <div style={{ marginTop: 4, opacity: 0.75, whiteSpace: "pre-wrap" }}>{replyPreview.body}</div> : null}<div style={{ marginTop: 8 }}><button type="button" className="button secondary" onClick={() => { setReplyTo(null); setReplyPreview(null); }}>Clear reply</button></div></div> : null}
             <textarea id="message-body" name="messageBody" value={body} onChange={(e) => setBody(e.target.value)} placeholder="Type a group message" style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
             <input id="link-url" name="linkUrl" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="Optional link" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
             <input id="group-attachment" name="groupAttachment" type="file" accept="image/*,.pdf,.doc,.docx,.txt,.zip" onChange={(e) => setAttachment(e.target.files?.[0] || null)} />

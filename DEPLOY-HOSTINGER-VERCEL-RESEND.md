@@ -175,3 +175,11 @@ This version adds:
 
 Run this migration too:
 - supabase-v051-threading-reactions-profiles.sql
+
+## v052 reply and profile layout polish
+This version adds:
+- fixed group Reply button wiring so reply state is clearly attached in group threads
+- profile page layout now shows:
+  - first profile photo at the top
+  - profile details next
+  - remaining photos after the profile details

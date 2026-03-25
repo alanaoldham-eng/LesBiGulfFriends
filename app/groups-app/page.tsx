@@ -20,31 +20,26 @@ export default function GroupsAppPage() {
   const [isPrivate, setIsPrivate] = useState(false);
   const [status, setStatus] = useState("");
 
-const refresh = async (uid: string) => {
-  const [all, mine, profile] = await Promise.all([
-    getPublicAndMemberGroups(uid),
-    listMyGroups(uid),
-    getMyProfile(uid).catch(() => null),
-  ]);
+  const refresh = async (uid: string) => {
+    const [all, mine, profile] = await Promise.all([
+      getPublicAndMemberGroups(uid).catch(() => []),
+      listMyGroups(uid).catch(() => []),
+      getMyProfile(uid).catch(() => null),
+    ]);
+    setGroups(all);
+    setMyGroups(mine);
+    setKarmaPoints(Number(profile?.karma_points || 0));
+  };
 
-  setGroups(all);
-  setMyGroups(mine);
-  setKarmaPoints(Number(profile?.karma_points || 0));
-};
-
-useEffect(() => {
-  const run = async () => {
-    try {
+  useEffect(() => {
+    const run = async () => {
       const user = await getCurrentUser();
       if (!user) return;
       setMe(user.id);
       await refresh(user.id);
-    } catch (e: any) {
-      setStatus(e.message || "Unable to load groups.");
-    }
-  };
-  run();
-}, []);
+    };
+    run();
+  }, []);
 
   const doJoin = async (groupId: string) => {
     try {
