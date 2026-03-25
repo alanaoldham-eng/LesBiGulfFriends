@@ -374,9 +374,10 @@ export async function listPublicGroups() {
   const { data, error } = await supabase
     .from("groups")
     .select("*")
-    .eq("is_private", false)
+    .or("is_private.eq.false,is_private.is.null")
     .order("created_at", { ascending: false })
     .limit(100);
+
   if (error) throw error;
   return data || [];
 }
