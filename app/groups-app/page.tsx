@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ClientShell } from "../../components/ClientShell";
 import { EmptyState } from "../../components/EmptyState";
 import { getCurrentUser } from "../../lib/auth";
-import { getMyProfile, createGroup, joinGroup, listMyGroups, getAccessibleGroups } from "../../lib/db";
+import { getMyProfile, createGroup, joinGroup, listMyGroups, getPublicAndMemberGroups } from "../../lib/db";
 
 export default function GroupsAppPage() {
   const [me, setMe] = useState("");
@@ -22,7 +22,7 @@ export default function GroupsAppPage() {
 
   const refresh = async (uid: string) => {
     const [all, mine, profile] = await Promise.all([
-      getAccessibleGroups(uid).catch(() => []),
+      getPublicAndMemberGroups(uid).catch(() => []),
       listMyGroups(uid).catch(() => []),
       getMyProfile(uid).catch(() => null),
     ]);
@@ -80,7 +80,7 @@ export default function GroupsAppPage() {
       <section className="hero">
         <h1 style={{ margin: 0, fontSize: 30 }}>Groups</h1>
         <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
-          Create public or private groups. Group owners can now moderate members, promote moderators, and remove people when needed. Creating a group costs 1 karma point.
+          Browse all public groups any time. You can also create public or private groups. Group owners can moderate members, promote moderators, and remove people when needed. Creating a group costs 1 karma point.
         </p>
       </section>
 
@@ -105,7 +105,7 @@ export default function GroupsAppPage() {
               <button className="button" onClick={doCreate} disabled={!me || !name}>Create group</button>
             </div>
           ) : (
-            <EmptyState title="Need 1 karma point" body="Creating a group costs 1 karma point. Earn karma by inviting a friend who joins and posts an introduction in Main." />
+            <EmptyState title="Need 1 karma point" body="Creating a group costs 1 karma point. Public groups are still visible below even if you have 0 karma." />
           )}
         </section>
 
@@ -126,7 +126,7 @@ export default function GroupsAppPage() {
                 )}
               </div>
             </div>
-          )) : <EmptyState title="No groups yet" body="Create the first group to get the community talking." />}
+          )) : <EmptyState title="No groups yet" body="Public groups will appear here even if you have 0 karma." />}
         </section>
 
         {status ? <p style={{ margin: 0, opacity: 0.8 }}>{status}</p> : null}

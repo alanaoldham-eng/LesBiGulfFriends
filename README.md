@@ -365,3 +365,18 @@ This version adds:
 
 Run this migration too:
 - `supabase-v050-private-groups-moderation.sql`
+
+## v051 groups visibility + threading + reactions + member profiles
+This version adds:
+- public groups remain visible even when the user has 0 karma
+- group creation and event creation stay hidden when the user has 0 karma
+- group message threading with reply
+- event message threading with reply
+- emoji reactions on group and event messages
+- clickable message authors that open member profiles
+- Add Friend button from message authors and member profiles
+- first profile photo shown next to message authors
+- clickable requester names on the Friends page
+
+Run this migration too:
+- supabase-v051-threading-reactions-profiles.sql

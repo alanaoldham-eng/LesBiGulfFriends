@@ -368,3 +368,149 @@ export async function spendKarmaPoint(userId: string, reason: string) {
   const { error } = await supabase.rpc("spend_karma_point", { p_user_id: userId, p_reason: reason });
   if (error) throw error;
 }
+
+
+export async function listPublicGroups() {
+  const { data, error } = await supabase
+    .from("groups")
+    .select("*")
+    .eq("is_private", false)
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getPublicAndMemberGroups(userId: string) {
+  const [publicGroups, myGroups] = await Promise.all([
+    listPublicGroups().catch(() => []),
+    listMyGroups(userId).catch(() => []),
+  ]);
+  const map = new Map<string, any>();
+  [...publicGroups, ...myGroups].forEach((g: any) => map.set(g.id, g));
+  return Array.from(map.values()).sort((a: any, b: any) => (a.created_at < b.created_at ? 1 : -1));
+}
+
+export async function getFriendIds(me: string): Promise<Set<string>> {
+  const rows = await listFriends(me);
+  return new Set<string>((rows || []).map((x: any) => String(x.id)));
+}
+
+export async function getIncomingFriendRequests(me: string) {
+  const requests = await listFriendRequests();
+  const incoming = (requests || []).filter((r: any) => r.to_user === me && r.status === "pending");
+  const senderIds = incoming.map((r: any) => r.from_user);
+  let profiles: any[] = [];
+  if (senderIds.length) {
+    const { data, error } = await supabase.from("profiles").select("*").in("id", senderIds);
+    if (error) throw error;
+    profiles = data || [];
+  }
+  const map = new Map(profiles.map((p: any) => [p.id, p]));
+  return incoming.map((r: any) => ({ ...r, from_profile: map.get(r.from_user) || null }));
+}
+
+export async function getProfileMessagesProfiles(senderIds: string[]) {
+  if (!senderIds.length) return new Map<string, any>();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, display_name, photo_url, photo_urls, bio, city, relationship_status")
+    .in("id", [...new Set(senderIds)]);
+  if (error) throw error;
+  return new Map((data || []).map((p: any) => [p.id, p]));
+}
+
+export async function listGroupMessagesDetailed(group_id: string) {
+  const messages = await listGroupMessages(group_id);
+  const profileMap = await getProfileMessagesProfiles(messages.map((m: any) => m.sender_id));
+  const { data: reactions, error } = await supabase
+    .from("group_message_reactions")
+    .select("*")
+    .eq("group_id", group_id);
+  if (error) throw error;
+  const byMessage = new Map<string, any[]>();
+  (reactions || []).forEach((r: any) => {
+    byMessage.set(r.message_id, [...(byMessage.get(r.message_id) || []), r]);
+  });
+  return (messages || []).map((m: any) => ({
+    ...m,
+    profile: profileMap.get(m.sender_id) || null,
+    reactions: byMessage.get(m.id) || [],
+  }));
+}
+
+export async function sendGroupReply(group_id: string, sender_id: string, body: string, parent_message_id?: string | null, media_url?: string | null, media_type?: string | null, link_url?: string | null) {
+  const { error } = await supabase.from("group_messages").insert({
+    group_id,
+    sender_id,
+    body: body ?? "",
+    parent_message_id: parent_message_id || null,
+    media_url: media_url || null,
+    media_type: media_type || null,
+    link_url: link_url || null,
+  });
+  if (error) throw error;
+}
+
+export async function reactToGroupMessage(group_id: string, message_id: string, user_id: string, emoji: string) {
+  const { error } = await supabase
+    .from("group_message_reactions")
+    .insert({ group_id, message_id, user_id, emoji });
+  if (error) throw error;
+}
+
+export async function listEventMessages(event_id: string) {
+  const { data, error } = await supabase
+    .from("event_messages")
+    .select("*")
+    .eq("event_id", event_id)
+    .order("created_at", { ascending: true })
+    .limit(300);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function listEventMessagesDetailed(event_id: string) {
+  const messages = await listEventMessages(event_id);
+  const profileMap = await getProfileMessagesProfiles(messages.map((m: any) => m.sender_id));
+  const { data: reactions, error } = await supabase
+    .from("event_message_reactions")
+    .select("*")
+    .eq("event_id", event_id);
+  if (error) throw error;
+  const byMessage = new Map<string, any[]>();
+  (reactions || []).forEach((r: any) => {
+    byMessage.set(r.message_id, [...(byMessage.get(r.message_id) || []), r]);
+  });
+  return (messages || []).map((m: any) => ({
+    ...m,
+    profile: profileMap.get(m.sender_id) || null,
+    reactions: byMessage.get(m.id) || [],
+  }));
+}
+
+export async function sendEventMessage(event_id: string, sender_id: string, body: string, parent_message_id?: string | null, media_url?: string | null, media_type?: string | null, link_url?: string | null) {
+  const { error } = await supabase.from("event_messages").insert({
+    event_id,
+    sender_id,
+    body: body ?? "",
+    parent_message_id: parent_message_id || null,
+    media_url: media_url || null,
+    media_type: media_type || null,
+    link_url: link_url || null,
+  });
+  if (error) throw error;
+}
+
+export async function reactToEventMessage(event_id: string, message_id: string, user_id: string, emoji: string) {
+  const { error } = await supabase
+    .from("event_message_reactions")
+    .insert({ event_id, message_id, user_id, emoji });
+  if (error) throw error;
+}
+
+export async function getEventById(event_id: string) {
+  const { data, error } = await supabase.from("events").select("*").eq("id", event_id).single();
+  if (error) throw error;
+  return data;
+}
