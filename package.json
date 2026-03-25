@@ -10,9 +10,11 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",
+    "lucide-react": "^1.6.0",
     "next": "^15.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "tailwindcss": "^4.2.2",
     "tinacms": "^2.7.0"
   },
   "devDependencies": {

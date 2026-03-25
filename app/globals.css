@@ -1,161 +1,76 @@
-* { box-sizing: border-box; }
-html, body { padding: 0; margin: 0; }
-body {
-  font-family: Inter, Arial, Helvetica, sans-serif;
-  background: linear-gradient(180deg, #fff8fb 0%, #fff 100%);
-  color: #24161f;
-}
-a { color: inherit; text-decoration: none; }
-.container {
-  width: min(100%, 480px);
-  margin: 0 auto;
-  padding: 16px;
-}
-.shell {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-.topbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-bottom: 1px solid #f1dfe8;
-  background: rgba(255,255,255,0.92);
-  position: sticky;
-  top: 0;
-  backdrop-filter: blur(8px);
-  z-index: 10;
-}
-.brand {
-  font-weight: 900;
-  line-height: 1.1;
-}
-.brand-sub {
-  font-size: 12px;
-  opacity: 0.65;
-}
-.hero {
-  padding: 20px 0 12px;
-}
-.grid {
-  display: grid;
-  gap: 14px;
-}
-.button {
-  appearance: none;
-  border: none;
-  border-radius: 16px;
-  padding: 12px 16px;
-  font-weight: 800;
-  background: #8d2d5d;
-  color: white;
-  cursor: pointer;
-}
-.button.secondary {
-  background: transparent;
-  color: #8d2d5d;
-  border: 1px solid #d7a8bf;
-}
-.footer-note {
-  margin-top: 24px;
-  padding: 12px 0 28px;
-  font-size: 13px;
-  opacity: 0.7;
-}
-.nav {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 12px;
-  margin-bottom: 18px;
-}
-.nav a {
-  padding: 10px 12px;
-  border: 1px solid #ecdbe4;
-  border-radius: 999px;
-  background: #fff;
-  font-size: 14px;
-  font-weight: 700;
+@import "tailwindcss";
+
+@theme inline {
+  /* Lesbian-flag-inspired warm palette */
+  --color-sunset: #D55A4A;
+  --color-coral: #F19483;
+  --color-blush: #F8D9D0;
+  --color-cream: #FFF9F7;
+  --color-rose: #A4486B;
+  --color-wine: #8D2D5D;
+  --color-dusty-rose: #C97B8B;
+  
+  /* Semantic design tokens */
+  --color-background: #FFF9F7;
+  --color-foreground: #2D1F26;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #2D1F26;
+  --color-popover: #FFFFFF;
+  --color-popover-foreground: #2D1F26;
+  --color-primary: #D55A4A;
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: #F8D9D0;
+  --color-secondary-foreground: #8D2D5D;
+  --color-muted: #F5EBE8;
+  --color-muted-foreground: #6B5A5E;
+  --color-accent: #F19483;
+  --color-accent-foreground: #2D1F26;
+  --color-destructive: #DC2626;
+  --color-destructive-foreground: #FFFFFF;
+  --color-border: #E8D5D5;
+  --color-input: #E8D5D5;
+  --color-ring: #D55A4A;
+
+  --radius: 1rem;
+  
+  /* Font families */
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-display: 'Fraunces', serif;
 }
 
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    border-color: var(--color-border);
+  }
 
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 999px;
-  border: 1px solid #efcad8;
-  background: #fff;
-  font-size: 13px;
-  font-weight: 800;
-  color: #8d2d5d;
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 }
-.landing-hero {
-  display: grid;
-  gap: 14px;
-  padding: 18px;
-  border: 1px solid #f1dfe8;
-  border-radius: 28px;
-  background:
-    radial-gradient(circle at top right, rgba(244, 182, 198, 0.35), transparent 35%),
-    linear-gradient(180deg, #fff6fa 0%, #fff 100%);
-  box-shadow: 0 14px 34px rgba(141,45,93,0.08);
-}
-.trust-row {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  font-size: 13px;
-  font-weight: 700;
-  opacity: 0.8;
-}
-.landing-secondary {
-  margin-top: 22px;
-  display: grid;
-  gap: 14px;
-}
-.onboarding-shell {
-  display: grid;
-  gap: 18px;
-}
-.onboarding-progress {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  margin-top: 8px;
-}
-.onboarding-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  background: #ead5df;
-}
-.onboarding-dot.active {
-  background: #8d2d5d;
-}
-.onboarding-card, .login-card {
-  border: 1px solid #f1dfe8;
-  border-radius: 28px;
-  padding: 22px 18px;
-  background:
-    radial-gradient(circle at top right, rgba(244, 182, 198, 0.28), transparent 34%),
-    linear-gradient(180deg, #fff7fb 0%, #fff 100%);
-  box-shadow: 0 14px 34px rgba(141,45,93,0.08);
-}
-.onboarding-emoji {
-  font-size: 44px;
-  line-height: 1;
-}
-.member-banner {
-  display: inline-flex;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: #f8e8ef;
-  color: #8d2d5d;
-  font-size: 13px;
-  font-weight: 800;
-  border: 1px solid #efcad8;
+
+@layer components {
+  .container-app {
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 0 1rem;
+  }
+  
+  @media (min-width: 768px) {
+    .container-app {
+      max-width: 1200px;
+      padding: 0 2rem;
+    }
+  }
 }
