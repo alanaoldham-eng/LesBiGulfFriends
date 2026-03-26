@@ -236,3 +236,12 @@ This version adds:
 
 Run this migration too:
 - supabase-v056-availability-badges-proposals.sql
+
+## v057 karma decimal refactor and balance rebuild
+This version adds:
+- decimal-safe karma display formatting in the app
+- a migration to rebuild `profiles.karma_points` from the full `karma_ledger`
+- support for decimal karma totals after changing the database columns to `numeric`
+
+Run this migration too:
+- `supabase-v057-rebuild-karma-balances.sql`

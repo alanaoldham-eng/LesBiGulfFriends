@@ -4,6 +4,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { listKarmaStandings } from "../lib/db";
 
+function formatKarma(value: any) {
+  const num = Number(value || 0);
+  return Number.isInteger(num) ? String(num) : num.toFixed(1).replace(/\.0$/, "");
+}
+
 export function KarmaStandingsPreview() {
   const [rows, setRows] = useState<any[]>([]);
 
@@ -35,7 +40,7 @@ export function KarmaStandingsPreview() {
                 <Link href={`/members/${row.id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>
                   {row.display_name || "Member"}
                 </Link>
-                <div style={{ opacity: 0.8 }}>{Number(row.karma_points || 0)} karma</div>
+                <div style={{ opacity: 0.8 }}>{formatKarma(row.karma_points)} karma</div>
               </div>
             </div>
           </section>

@@ -8,6 +8,11 @@ import { getCurrentUser } from "../../lib/auth";
 import Link from "next/link";
 import { deletePublicImage, getMainGroupId, getMyProfile, hasPostedIntroduction, upsertMyProfile, uploadPublicImage, listBadgesForUser, type RelationshipStatus } from "../../lib/db";
 
+function formatKarma(value: any) {
+  const num = Number(value || 0);
+  return Number.isInteger(num) ? String(num) : num.toFixed(1).replace(/\.0$/, "");
+}
+
 const RELATIONSHIP_OPTIONS = [
   "single",
   "coupled",
@@ -128,7 +133,7 @@ export default function ProfilePage() {
         </p>
 {badges.length ? <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>{badges.map((badge) => <span key={badge.id} style={{ padding: "6px 10px", borderRadius: 999, background: "#fff7fb", border: "1px solid #f1dfe8" }}>{badge.emoji} {badge.badge_label}</span>)}</div> : null}
         <div style={{ marginTop: 12, padding: 12, borderRadius: 16, border: "1px solid #efcad8", background: "#fff" }}>
-          <strong>Karma points:</strong> {karmaPoints}
+          <strong>Karma points:</strong> {formatKarma(karmaPoints)}
         </div>
         {(!bio || !city || !photoUrls[0] || !hasIntro) ? (
           <div style={{ marginTop: 12, padding: 14, borderRadius: 16, border: "1px solid #efcad8", background: "#fff" }}>
