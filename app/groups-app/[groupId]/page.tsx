@@ -85,13 +85,13 @@ export default function GroupThreadPage() {
       getMyGroupMembership(groupId, uid).catch(() => null),
       listGroupMembers(groupId).catch(() => []),
       listGroupMessagesDetailed(groupId).catch(() => []),
-      getFriendIds(uid).catch(() => new Set()),
+      getFriendIds(uid).catch(() => new Set<string>()),
     ]);
     setGroup(groupRow);
     setMembership(membershipRow);
     setMembers(memberRows);
     setMessages(messageRows);
-    setFriendIds(fids as Set<string>);
+    setFriendIds(fids);
   };
 
   useEffect(() => {

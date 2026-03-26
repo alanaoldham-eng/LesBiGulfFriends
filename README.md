@@ -388,3 +388,30 @@ This version adds:
   - first profile photo at the top
   - profile details next
   - remaining photos after the profile details
+
+## v053 karma roadmap, public activity rewards, and internal feedback
+This version adds:
+- in-app explanation for what comes next with karma:
+  - phase 1 uses a database ledger
+  - phase 2 plans an ERC-20 token on Base
+  - embedded wallets by email using Thirdweb
+  - intended airdrop path when moving from the database ledger to blockchain
+- internal bug report / feature request page that stores records directly in the database
+- karma rewards for public activity:
+  - 0.3 for a new post in a public group or public event
+  - 0.2 for a reply in a public group or public event
+  - 0.1 for an emoji reaction in a public group or public event
+
+Run this migration too:
+- supabase-v053-karma-roadmap-feedback-public-rewards.sql
+
+## v054 abuse reporting and inviter karma penalty
+This version adds:
+- a Report abuse option alongside Report bug and Request feature
+- abuse reports are stored only in the database, not shown in the web app
+- abuse reports can include a reported user id
+- when a user is reported for abuse, the inviter loses 1 karma point
+- lost karma points are tracked as moving into the future prize wallet for gamification rewards
+
+Run this migration too:
+- supabase-v054-abuse-reporting-prize-wallet.sql

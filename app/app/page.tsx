@@ -37,6 +37,17 @@ export default function AppHomePage() {
           This is your connected MVP dashboard. Profiles, friends, messages, and group chat are now wired for Supabase.
         </p>
       </section>
+
+<section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff", marginTop: 16 }}>
+  <h3 style={{ marginTop: 0 }}>Phase 2 preview</h3>
+  <p style={{ margin: 0, lineHeight: 1.7, opacity: 0.9 }}>
+    Karma is currently tracked in our database ledger so we can keep the community moving quickly in phase 1.
+    In phase 2, karma is planned to become an ERC-20 token on Base. Members will have embedded wallets tied to
+    their email address using Thirdweb, and the phase 1 karma ledger is intended to guide a future airdrop when
+    the database system is replaced by blockchain rewards.
+  </p>
+</section>
+
       <div className="grid">
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <h3 style={{ marginTop: 0 }}>Your snapshot</h3>

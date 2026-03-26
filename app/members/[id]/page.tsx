@@ -12,7 +12,7 @@ export default function MemberProfilePage() {
   const memberId = params.id;
   const [me, setMe] = useState("");
   const [profile, setProfile] = useState<any | null>(null);
-  const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
+  const [friendIds, setFriendIds] = useState<Set<string>>(new Set<string>());
   const [status, setStatus] = useState("");
 
   useEffect(() => {

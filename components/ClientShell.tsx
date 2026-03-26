@@ -17,6 +17,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         <Link href="/groups-app" className="button secondary">Groups</Link>
         <Link href="/events-app" className="button secondary">Events</Link>
         <Link href="/invites" className="button secondary">Invites</Link>
+        <Link href="/feedback" className="button secondary">Bug / Feature</Link>
         <button className="button secondary" onClick={() => signOutEverywhere()}>Logout</button>
       </div>
       {children}

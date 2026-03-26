@@ -65,7 +65,7 @@ export default function EventsAppPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [eventInvites, setEventInvites] = useState<any[]>([]);
   const [eventMessages, setEventMessages] = useState<any[]>([]);
-  const [friendIds, setFriendIds] = useState<Set<string>>(new Set<string>());
+  const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
   const [body, setBody] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
@@ -86,24 +86,22 @@ export default function EventsAppPage() {
     }
   };
 
-useEffect(() => {
-  const run = async () => {
-    const user = await getCurrentUser();
-    if (!user) return;
-    setMe(user.id);
-
-    const [profile, fids] = await Promise.all([
-      getMyProfile(user.id).catch(() => null),
-      getFriendIds(user.id).catch(() => new Set<string>()),
-    ]);
-
-    setDisplayName(profile?.display_name || "A member");
-    setKarmaPoints(Number(profile?.karma_points || 0));
-    setFriendIds(fids);
-    await refreshEvents(user.id);
-  };
-  run();
-}, []);
+  useEffect(() => {
+    const run = async () => {
+      const user = await getCurrentUser();
+      if (!user) return;
+      setMe(user.id);
+      const [profile, fids] = await Promise.all([
+        getMyProfile(user.id).catch(() => null),
+        getFriendIds(user.id).catch(() => new Set<string>()),
+      ]);
+      setDisplayName(profile?.display_name || "A member");
+      setKarmaPoints(Number(profile?.karma_points || 0));
+      setFriendIds(fids);
+      await refreshEvents(user.id);
+    };
+    run();
+  }, []);
 
   const create = async () => {
     try {

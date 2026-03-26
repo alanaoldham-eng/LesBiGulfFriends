@@ -393,7 +393,7 @@ export async function getPublicAndMemberGroups(userId: string) {
 
 export async function getFriendIds(me: string): Promise<Set<string>> {
   const rows = await listFriends(me);
-  return new Set<string>((rows || []).map((x: any) => x.id));
+  return new Set<string>((rows || []).map((x: any) => String(x.id)));
 }
 
 export async function getIncomingFriendRequests(me: string) {
@@ -513,4 +513,16 @@ export async function getEventById(event_id: string) {
   const { data, error } = await supabase.from("events").select("*").eq("id", event_id).single();
   if (error) throw error;
   return data;
+}
+
+
+export async function submitFeedbackItem(payload: {
+  user_id: string;
+  kind: "bug" | "feature_request" | "abuse_report";
+  title: string;
+  details: string;
+  reported_user_id?: string | null;
+}) {
+  const { error } = await supabase.from("feedback_items").insert(payload);
+  if (error) throw error;
 }
