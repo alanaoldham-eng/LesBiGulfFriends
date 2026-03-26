@@ -27,6 +27,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         <Link href="/friends" className="button secondary">Friends</Link>
         <Link href="/messages" className="button secondary">Messages</Link>
         <Link href="/groups-app" className="button secondary">Groups</Link>
+        <Link href="/availability" className="button secondary">Availability</Link>
+        <Link href="/proposals" className="button secondary">Proposals</Link>
         <Link href="/events-app" className="button secondary">Events</Link>
         <Link href="/invites" className="button secondary">Invites</Link>
         <Link href="/feedback" className="button secondary">Bug / Feature</Link>

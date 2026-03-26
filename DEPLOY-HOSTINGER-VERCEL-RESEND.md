@@ -221,3 +221,18 @@ This version adds:
 
 Run this migration too:
 - supabase-v055-admin-rewards-landing-standings.sql
+
+## v056 standings, availability, badges, proposals, and voting
+This version adds:
+- karma standings for all users with more than 0 karma under the member home snapshot
+- duplicate-safe Add Friend behavior from member profile and group/event messages
+- member availability calendar for the next 3 months
+- manual OG badge granting from the admin panel
+- proposal system with one vote per member
+- completed-profile requirement for voting
+- vote reward of 1 karma
+- automatic unique "I Voted" badge per election
+- proposal email invite route for new proposals
+
+Run this migration too:
+- supabase-v056-availability-badges-proposals.sql

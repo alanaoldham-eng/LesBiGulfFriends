@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ClientShell } from "../../../components/ClientShell";
 import { getCurrentUser } from "../../../lib/auth";
-import { getProfileById, getFriendIds, sendFriendRequest } from "../../../lib/db";
+import { getProfileById, getFriendIds, sendFriendRequest, listBadgesForUser } from "../../../lib/db";
 
 export default function MemberProfilePage() {
   const params = useParams<{ id: string }>();
@@ -14,6 +14,7 @@ export default function MemberProfilePage() {
   const [profile, setProfile] = useState<any | null>(null);
   const [friendIds, setFriendIds] = useState<Set<string>>(new Set<string>());
   const [status, setStatus] = useState("");
+  const [badges, setBadges] = useState<any[]>([]);
 
   useEffect(() => {
     const run = async () => {
@@ -32,8 +33,8 @@ export default function MemberProfilePage() {
 
   const addFriend = async () => {
     try {
-      await sendFriendRequest(me, memberId);
-      setStatus("Friend request sent.");
+      const result: any = await sendFriendRequest(me, memberId);
+      setStatus(result?.duplicate ? "Friend request already pending." : "Friend request sent.");
     } catch (e: any) {
       setStatus(e.message || "Unable to send friend request.");
     }
@@ -59,6 +60,7 @@ export default function MemberProfilePage() {
           <p style={{ opacity: 0.8 }}>{profile?.bio || "No bio yet."}</p>
           {profile?.city ? <p style={{ opacity: 0.75 }}>City: {profile.city}</p> : null}
           {profile?.relationship_status ? <p style={{ opacity: 0.75 }}>Relationship status: {profile.relationship_status}</p> : null}
+          {badges.length ? <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>{badges.map((badge) => <span key={badge.id} style={{ padding: "6px 10px", borderRadius: 999, background: "#fff7fb", border: "1px solid #f1dfe8" }}>{badge.emoji} {badge.badge_label}</span>)}</div> : null}
           {!isSelf && !isFriend ? <button className="button" onClick={addFriend}>Add Friend</button> : null}
           {status ? <p style={{ marginTop: 12, opacity: 0.8 }}>{status}</p> : null}
         </section>

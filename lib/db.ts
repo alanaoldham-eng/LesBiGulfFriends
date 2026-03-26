@@ -56,7 +56,13 @@ export async function listFriendRequests() {
 
 export async function sendFriendRequest(from_user: string, to_user: string) {
   const { error } = await supabase.from("friend_requests").insert({ from_user, to_user, status: "pending" });
-  if (error) throw error;
+  if (error) {
+    if ((error as any).code === "23505" || String((error as any).message || "").toLowerCase().includes("duplicate key")) {
+      return { duplicate: true };
+    }
+    throw error;
+  }
+  return { duplicate: false };
 }
 
 export async function acceptFriendRequest(requestId: string) {
@@ -568,4 +574,121 @@ export async function rewardUserKarma(user_id: string, amount: number, note: str
     p_note: note,
   });
   if (error) throw error;
+}
+
+
+export async function listPositiveKarmaStandings(limit = 200) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, display_name, photo_url, photo_urls, karma_points")
+    .gt("karma_points", 0)
+    .order("karma_points", { ascending: false })
+    .order("display_name", { ascending: true })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function listBadgesForUser(userId: string) {
+  const { data, error } = await supabase
+    .from("user_badges")
+    .select("id, badge_key, badge_label, emoji, election_key, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function listAvailabilityEntries(dateFrom?: string, dateTo?: string) {
+  let q = supabase
+    .from("member_availability")
+    .select("*")
+    .order("start_at", { ascending: true })
+    .limit(1000);
+  if (dateFrom) q = q.gte("start_at", dateFrom);
+  if (dateTo) q = q.lte("start_at", dateTo);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function upsertAvailabilityEntry(payload: {
+  id?: string;
+  user_id: string;
+  start_at: string;
+  end_at: string;
+  note?: string | null;
+}) {
+  const { error } = await supabase.from("member_availability").upsert(payload);
+  if (error) throw error;
+}
+
+export async function deleteAvailabilityEntry(id: string, user_id: string) {
+  const { error } = await supabase.from("member_availability").delete().eq("id", id).eq("user_id", user_id);
+  if (error) throw error;
+}
+
+export async function listProposals(activeOnly = false) {
+  let q = supabase.from("proposals").select("*").order("created_at", { ascending: false });
+  if (activeOnly) q = q.gt("expires_at", new Date().toISOString());
+  const { data, error } = await q.limit(200);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createProposal(payload: {
+  title: string;
+  description: string;
+  expires_at: string;
+  created_by: string;
+  election_key: string;
+}) {
+  const { data, error } = await supabase.from("proposals").insert(payload).select("*").single();
+  if (error) throw error;
+  return data;
+}
+
+export async function castProposalVote(payload: {
+  proposal_id: string;
+  user_id: string;
+  vote_value: string;
+}) {
+  const { error } = await supabase.from("proposal_votes").insert(payload);
+  if (error) throw error;
+}
+
+export async function listProposalVotes(proposal_id: string) {
+  const { data, error } = await supabase
+    .from("proposal_votes")
+    .select("*")
+    .eq("proposal_id", proposal_id)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function listProfilesForAdmin() {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, display_name, photo_url, photo_urls, karma_points")
+    .order("display_name", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function grantBadge(user_id: string, badge_key: string, badge_label: string, emoji: string, election_key?: string | null) {
+  const { error } = await supabase.rpc("grant_badge", {
+    p_user_id: user_id,
+    p_badge_key: badge_key,
+    p_badge_label: badge_label,
+    p_emoji: emoji,
+    p_election_key: election_key || null,
+  });
+  if (error) throw error;
+}
+
+export async function hasCompleteProfile(userId: string) {
+  const p = await getProfileById(userId);
+  if (!p) return false;
+  return Boolean((p.display_name || "").trim() && (p.bio || "").trim());
 }

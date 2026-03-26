@@ -68,7 +68,7 @@ export default function GroupThreadPage() {
   const [membership, setMembership] = useState<any | null>(null);
   const [members, setMembers] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
-  const [friendIds, setFriendIds] = useState<Set<string>>(new Set<string>());
+  const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
   const [body, setBody] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
@@ -134,8 +134,11 @@ export default function GroupThreadPage() {
 
   const addFriend = async (userId: string) => {
     try {
-      await sendFriendRequest(me, userId);
-      setStatus("Friend request sent.");
+      const result: any = await sendFriendRequest(me, userId);
+      setStatus(result?.duplicate ? "Friend request already pending." : "Friend request sent.");
+      if (!result?.duplicate) {
+        setFriendIds(new Set<string>([...Array.from(friendIds), userId]));
+      }
     } catch (e: any) {
       setStatus(e.message || "Unable to send friend request.");
     }

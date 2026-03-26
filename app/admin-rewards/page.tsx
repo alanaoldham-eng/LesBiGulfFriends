@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
 import { ClientShell } from "../../components/ClientShell";
 import { getCurrentUser } from "../../lib/auth";
-import { listReportableProfiles, rewardUserKarma } from "../../lib/db";
+import { listProfilesForAdmin, rewardUserKarma, grantBadge } from "../../lib/db";
 
 const ADMIN_EMAIL = "alanaoldham@gmail.com";
 
@@ -15,6 +15,11 @@ export default function AdminRewardsPage() {
   const [amount, setAmount] = useState("1");
   const [note, setNote] = useState("Helpful community member");
   const [status, setStatus] = useState("");
+  const [badgeUserId, setBadgeUserId] = useState("");
+  const [badgeLabel, setBadgeLabel] = useState("OG");
+  const [badgeEmoji, setBadgeEmoji] = useState("👑");
+  const [badgeKey, setBadgeKey] = useState("og");
+  const [badgeElectionKey, setBadgeElectionKey] = useState("");
 
   useEffect(() => {
     const run = async () => {
@@ -23,7 +28,7 @@ export default function AdminRewardsPage() {
       const email = user.email?.toLowerCase() || "";
       if (email === ADMIN_EMAIL) {
         setAllowed(true);
-        const rows = await listReportableProfiles(user.id).catch(() => []);
+        const rows = await listProfilesForAdmin().catch(() => []);
         setProfiles(rows);
       }
     };
@@ -36,6 +41,15 @@ export default function AdminRewardsPage() {
       setStatus("Karma reward granted.");
     } catch (e: any) {
       setStatus(e.message || "Unable to reward karma.");
+    }
+  };
+
+  const giveBadge = async () => {
+    try {
+      await grantBadge(badgeUserId, badgeKey, badgeLabel, badgeEmoji, badgeElectionKey || null);
+      setStatus("Badge granted.");
+    } catch (e: any) {
+      setStatus(e.message || "Unable to grant badge.");
     }
   };
 
@@ -88,6 +102,23 @@ export default function AdminRewardsPage() {
             </button>
             {status ? <p style={{ margin: 0, opacity: 0.8 }}>{status}</p> : null}
           </div>
+                  <div style={{ height: 16 }} />
+          <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
+            <h3 style={{ marginTop: 0 }}>Grant badge</h3>
+            <div style={{ display: "grid", gap: 12 }}>
+              <select id="badge-user-id" name="badgeUserId" value={badgeUserId} onChange={(e) => setBadgeUserId(e.target.value)} style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, background: "#fff" }}>
+                <option value="">Select member</option>
+                {profiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>{profile.display_name || profile.id}</option>
+                ))}
+              </select>
+              <input id="badge-key" name="badgeKey" value={badgeKey} onChange={(e) => setBadgeKey(e.target.value)} placeholder="Badge key" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+              <input id="badge-label" name="badgeLabel" value={badgeLabel} onChange={(e) => setBadgeLabel(e.target.value)} placeholder="Badge label" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+              <input id="badge-emoji" name="badgeEmoji" value={badgeEmoji} onChange={(e) => setBadgeEmoji(e.target.value)} placeholder="Badge emoji" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+              <input id="badge-election-key" name="badgeElectionKey" value={badgeElectionKey} onChange={(e) => setBadgeElectionKey(e.target.value)} placeholder="Election key (optional)" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+              <button className="button" onClick={giveBadge} disabled={!badgeUserId || !badgeKey || !badgeLabel || !badgeEmoji}>Grant badge</button>
+            </div>
+          </section>
         </section>
       )}
     </ClientShell>

@@ -6,7 +6,7 @@ import { ClientShell } from "../../components/ClientShell";
 import { EmptyState } from "../../components/EmptyState";
 import { getCurrentUser } from "../../lib/auth";
 import Link from "next/link";
-import { deletePublicImage, getMainGroupId, getMyProfile, hasPostedIntroduction, upsertMyProfile, uploadPublicImage, type RelationshipStatus } from "../../lib/db";
+import { deletePublicImage, getMainGroupId, getMyProfile, hasPostedIntroduction, upsertMyProfile, uploadPublicImage, listBadgesForUser, type RelationshipStatus } from "../../lib/db";
 
 const RELATIONSHIP_OPTIONS = [
   "single",
@@ -26,6 +26,7 @@ export default function ProfilePage() {
   const [status, setStatus] = useState("Loading...");
   const [karmaPoints, setKarmaPoints] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [badges, setBadges] = useState<any[]>([]);
   const [mainGroupId, setMainGroupId] = useState<string | null>(null);
   const [hasIntro, setHasIntro] = useState(false);
   const canAddMorePhotos = photoUrls.length < 3;
@@ -48,12 +49,14 @@ export default function ProfilePage() {
           setRelationshipStatus((profile.relationship_status as RelationshipStatus | null) || "");
           setPhotoUrls(profile.photo_urls || (profile.photo_url ? [profile.photo_url] : []));
           setKarmaPoints(Number(profile.karma_points || 0));
-          const [mainId, introPosted] = await Promise.all([
+          const [mainId, introPosted, badgeRows] = await Promise.all([
             getMainGroupId().catch(() => null),
             hasPostedIntroduction(user.id).catch(() => false),
+            listBadgesForUser(user.id).catch(() => []),
           ]);
           setMainGroupId(mainId);
           setHasIntro(introPosted);
+          setBadges(badgeRows);
           setStatus("");
         } catch {
           setStatus("Create your profile to get started.");
@@ -123,6 +126,7 @@ export default function ProfilePage() {
         <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
           Set a nickname or display name so the app shows that instead of your email address. Add up to 3 photos, choose their order, and tell people a little about yourself.
         </p>
+{badges.length ? <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>{badges.map((badge) => <span key={badge.id} style={{ padding: "6px 10px", borderRadius: 999, background: "#fff7fb", border: "1px solid #f1dfe8" }}>{badge.emoji} {badge.badge_label}</span>)}</div> : null}
         <div style={{ marginTop: 12, padding: 12, borderRadius: 16, border: "1px solid #efcad8", background: "#fff" }}>
           <strong>Karma points:</strong> {karmaPoints}
         </div>
