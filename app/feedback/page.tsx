@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
 import { ClientShell } from "../../components/ClientShell";
 import { getCurrentUser } from "../../lib/auth";
-import { submitFeedbackItem } from "../../lib/db";
+import { submitFeedbackItem, listReportableProfiles } from "../../lib/db";
 
 export default function FeedbackPage() {
   const [me, setMe] = useState("");
@@ -12,6 +12,7 @@ export default function FeedbackPage() {
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
   const [reportedUserId, setReportedUserId] = useState("");
+  const [reportableProfiles, setReportableProfiles] = useState<any[]>([]);
   const [status, setStatus] = useState("");
 
   useEffect(() => {
@@ -19,6 +20,8 @@ export default function FeedbackPage() {
       const user = await getCurrentUser();
       if (!user) return;
       setMe(user.id);
+      const profiles = await listReportableProfiles(user.id).catch(() => []);
+      setReportableProfiles(profiles);
     };
     run();
   }, []);
@@ -72,12 +75,27 @@ export default function FeedbackPage() {
             </select>
 
             {kind === "abuse_report" ? (
-              <input
+              <select
                 id="reported-user-id"
                 name="reportedUserId"
                 value={reportedUserId}
                 onChange={(e) => setReportedUserId(e.target.value)}
-                placeholder="Reported user ID"
+                style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, background: "#fff" }}
+              >
+                <option value="">Select reported user</option>
+                {reportableProfiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>{profile.display_name || profile.id}</option>
+                ))}
+              </select>
+            ) : null}
+
+            {kind === "abuse_report" ? (
+              <input
+                id="reported-user-note"
+                name="reportedUserNote"
+                value={reportedUserId}
+                onChange={(e) => setReportedUserId(e.target.value)}
+                placeholder="Or paste reported user ID"
                 style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
               />
             ) : null}

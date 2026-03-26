@@ -1,9 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { signOutEverywhere } from "../lib/auth";
+import { useEffect, useState } from "react";
+import { signOutEverywhere, getCurrentUser } from "../lib/auth";
+
+const ADMIN_EMAIL = "alanaoldham@gmail.com";
 
 export function ClientShell({ children }: { children: React.ReactNode }) {
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    getCurrentUser().then((user) => {
+      const email = user?.email?.toLowerCase() || "";
+      setIsAdmin(email === ADMIN_EMAIL);
+    });
+  }, []);
+
   return (
     <>
       <div style={{ marginBottom: 14 }}>
@@ -18,6 +30,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         <Link href="/events-app" className="button secondary">Events</Link>
         <Link href="/invites" className="button secondary">Invites</Link>
         <Link href="/feedback" className="button secondary">Bug / Feature</Link>
+        {isAdmin ? <Link href="/admin-rewards" className="button secondary">Reward Karma</Link> : null}
         <button className="button secondary" onClick={() => signOutEverywhere()}>Logout</button>
       </div>
       {children}

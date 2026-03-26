@@ -65,7 +65,7 @@ export default function EventsAppPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [eventInvites, setEventInvites] = useState<any[]>([]);
   const [eventMessages, setEventMessages] = useState<any[]>([]);
-  const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
+  const [friendIds, setFriendIds] = useState<Set<string>>(new Set<string>());
   const [body, setBody] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);

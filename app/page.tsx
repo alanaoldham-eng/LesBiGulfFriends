@@ -1,6 +1,7 @@
 import { readJson } from "../lib/content";
 import { SectionCard } from "../components/SectionCard";
 import Link from "next/link";
+import { KarmaStandingsPreview } from "../components/KarmaStandingsPreview";
 
 type HomeContent = {
   title: string;
@@ -44,6 +45,17 @@ export default function HomePage() {
           <SectionCard title="Join groups" body="Discover interest-based groups and local circles without feeling flooded by too many features at once." />
         </div>
       </section>
+
+      <section className="landing-secondary">
+        <h2 style={{ marginTop: 0 }}>How karma works</h2>
+        <div className="grid">
+          <SectionCard title="Earn karma by helping" body="Members earn karma by posting, replying, reacting, and inviting friends who join and participate." />
+          <SectionCard title="Unlock more community power" body="Karma helps unlock actions like creating groups and events, while also powering future gamification and prizes." />
+          <SectionCard title="What comes next" body="Phase 2 is planned to move karma from a database ledger to an ERC-20 token on Base with Thirdweb embedded wallets by email and a future airdrop path." />
+        </div>
+      </section>
+
+      <KarmaStandingsPreview />
     </>
   );
 }

@@ -526,3 +526,46 @@ export async function submitFeedbackItem(payload: {
   const { error } = await supabase.from("feedback_items").insert(payload);
   if (error) throw error;
 }
+
+export async function listKarmaStandings(limit = 10) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, display_name, photo_url, photo_urls, karma_points")
+    .order("karma_points", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function listReportableProfiles(me: string) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, display_name")
+    .neq("id", me)
+    .order("display_name");
+  if (error) throw error;
+  return data || [];
+}
+
+export async function hasPostedIntroduction(userId: string) {
+  const mainGroupId = await getMainGroupId();
+  if (!mainGroupId) return false;
+  const { data, error } = await supabase
+    .from("group_messages")
+    .select("id")
+    .eq("group_id", mainGroupId)
+    .eq("sender_id", userId)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return !!data;
+}
+
+export async function rewardUserKarma(user_id: string, amount: number, note: string) {
+  const { error } = await supabase.rpc("reward_user_karma", {
+    p_user_id: user_id,
+    p_amount: amount,
+    p_note: note,
+  });
+  if (error) throw error;
+}

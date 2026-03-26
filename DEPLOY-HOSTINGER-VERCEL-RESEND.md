@@ -210,3 +210,14 @@ This version adds:
 
 Run this migration too:
 - supabase-v054-abuse-reporting-prize-wallet.sql
+
+## v055 admin rewards, abuse user selector, leaderboard, and profile CTA
+This version adds:
+- admin-only in-app karma reward panel
+- abuse report form can select a user instead of requiring a raw user id
+- landing page karma explanation
+- landing page karma leaderboard with clickable member names and primary photos
+- profile CTA encouraging members to complete their profile and post an introduction in Main
+
+Run this migration too:
+- supabase-v055-admin-rewards-landing-standings.sql

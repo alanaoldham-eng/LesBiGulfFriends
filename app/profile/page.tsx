@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 import { ClientShell } from "../../components/ClientShell";
 import { EmptyState } from "../../components/EmptyState";
 import { getCurrentUser } from "../../lib/auth";
-import { deletePublicImage, getMyProfile, upsertMyProfile, uploadPublicImage, type RelationshipStatus } from "../../lib/db";
+import Link from "next/link";
+import { deletePublicImage, getMainGroupId, getMyProfile, hasPostedIntroduction, upsertMyProfile, uploadPublicImage, type RelationshipStatus } from "../../lib/db";
 
 const RELATIONSHIP_OPTIONS = [
   "single",
@@ -25,6 +26,8 @@ export default function ProfilePage() {
   const [status, setStatus] = useState("Loading...");
   const [karmaPoints, setKarmaPoints] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [mainGroupId, setMainGroupId] = useState<string | null>(null);
+  const [hasIntro, setHasIntro] = useState(false);
   const canAddMorePhotos = photoUrls.length < 3;
 
   useEffect(() => {
@@ -45,6 +48,12 @@ export default function ProfilePage() {
           setRelationshipStatus((profile.relationship_status as RelationshipStatus | null) || "");
           setPhotoUrls(profile.photo_urls || (profile.photo_url ? [profile.photo_url] : []));
           setKarmaPoints(Number(profile.karma_points || 0));
+          const [mainId, introPosted] = await Promise.all([
+            getMainGroupId().catch(() => null),
+            hasPostedIntroduction(user.id).catch(() => false),
+          ]);
+          setMainGroupId(mainId);
+          setHasIntro(introPosted);
           setStatus("");
         } catch {
           setStatus("Create your profile to get started.");
@@ -117,6 +126,18 @@ export default function ProfilePage() {
         <div style={{ marginTop: 12, padding: 12, borderRadius: 16, border: "1px solid #efcad8", background: "#fff" }}>
           <strong>Karma points:</strong> {karmaPoints}
         </div>
+        {(!bio || !city || !photoUrls[0] || !hasIntro) ? (
+          <div style={{ marginTop: 12, padding: 14, borderRadius: 16, border: "1px solid #efcad8", background: "#fff" }}>
+            <strong>Complete your profile and say hello</strong>
+            <p style={{ margin: "8px 0 0", opacity: 0.85, lineHeight: 1.6 }}>
+              A fuller profile helps people trust you and connect. Then post an introduction in Main so the community can welcome you.
+            </p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+              <button className="button secondary" onClick={save}>Save profile</button>
+              {mainGroupId ? <Link className="button" href={`/groups-app/${mainGroupId}`}>Go to Main group</Link> : <Link className="button" href="/groups-app">Go to Groups</Link>}
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {loading ? (

@@ -68,7 +68,7 @@ export default function GroupThreadPage() {
   const [membership, setMembership] = useState<any | null>(null);
   const [members, setMembers] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
-  const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
+  const [friendIds, setFriendIds] = useState<Set<string>>(new Set<string>());
   const [body, setBody] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
