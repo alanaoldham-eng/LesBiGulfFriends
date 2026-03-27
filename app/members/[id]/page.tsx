@@ -12,7 +12,7 @@ export default function MemberProfilePage() {
   const memberId = params.id;
   const [me, setMe] = useState("");
   const [profile, setProfile] = useState<any | null>(null);
-  const [friendIds, setFriendIds] = useState<Set<string>>(new Set<string>());
+  const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState("");
   const [badges, setBadges] = useState<any[]>([]);
 
@@ -21,12 +21,14 @@ export default function MemberProfilePage() {
       const user = await getCurrentUser();
       if (!user) return;
       setMe(user.id);
-      const [p, ids] = await Promise.all([
+      const [p, ids, badgeRows]: [any, Set<string>, any[]] = await Promise.all([
         getProfileById(memberId).catch(() => null),
         getFriendIds(user.id).catch(() => new Set<string>()),
+        listBadgesForUser(memberId).catch(() => []),
       ]);
       setProfile(p);
       setFriendIds(ids);
+      setBadges(badgeRows);
     };
     run();
   }, [memberId]);

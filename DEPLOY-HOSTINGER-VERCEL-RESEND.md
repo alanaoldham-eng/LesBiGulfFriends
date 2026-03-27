@@ -245,3 +245,9 @@ This version adds:
 
 Run this migration too:
 - `supabase-v057-rebuild-karma-balances.sql`
+
+## v058 public badges and group member standings
+This version adds:
+- badges now load on public member profile pages
+- each group now shows member karma standings in descending order
+- the member list includes all members regardless of karma amount

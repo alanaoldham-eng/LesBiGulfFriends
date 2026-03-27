@@ -22,6 +22,11 @@ import {
 
 const EMOJIS = ["❤️", "👍", "😂", "🔥", "👏"];
 
+function formatKarma(value: any) {
+  const num = Number(value || 0);
+  return Number.isInteger(num) ? String(num) : num.toFixed(1).replace(/\.0$/, "");
+}
+
 function MessageCard({ m, me, friendIds, onAddFriend, onReply, onReact }: any) {
   const mainPhoto = m.profile?.photo_urls?.[0] || m.profile?.photo_url || null;
   const isFriend = friendIds.has(m.sender_id);
@@ -183,15 +188,17 @@ export default function GroupThreadPage() {
         </section>
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
-          <h3 style={{ marginTop: 0 }}>Members</h3>
-          {members.map((m) => (
+          <h3 style={{ marginTop: 0 }}>Member karma standings</h3>
+          <p style={{ marginTop: 0, opacity: 0.8 }}>All group members are listed below in descending karma order.</p>
+          {members.map((m, index) => (
             <div key={m.user_id} style={{ borderBottom: "1px solid #f1dfe8", padding: "10px 0" }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
                 <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                   {(m.profile?.photo_urls?.[0] || m.profile?.photo_url) ? <img src={m.profile?.photo_urls?.[0] || m.profile?.photo_url} alt={m.profile?.display_name || m.user_id} style={{ width: 36, height: 36, borderRadius: 999, objectFit: "cover" }} /> : null}
                   <div>
+                    <div style={{ fontSize: 12, opacity: 0.65 }}>#{index + 1}</div>
                     <Link href={`/members/${m.user_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>{m.profile?.display_name || m.user_id}</Link>
-                    <div style={{ opacity: 0.75 }}>{m.role}</div>
+                    <div style={{ opacity: 0.75 }}>{m.role} • {formatKarma(m.profile?.karma_points)} karma</div>
                   </div>
                 </div>
                 {canModerate && m.user_id !== me ? (

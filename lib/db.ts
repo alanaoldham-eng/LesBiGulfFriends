@@ -276,12 +276,22 @@ export async function listGroupMembers(groupId: string) {
   const userIds = (memberships || []).map((m: any) => m.user_id);
   let profiles: any[] = [];
   if (userIds.length) {
-    const { data: profs, error: pe } = await supabase.from("profiles").select("id, display_name, photo_url, photo_urls").in("id", userIds);
+    const { data: profs, error: pe } = await supabase
+      .from("profiles")
+      .select("id, display_name, photo_url, photo_urls, karma_points")
+      .in("id", userIds);
     if (pe) throw pe;
     profiles = profs || [];
   }
   const profileMap = new Map(profiles.map((p: any) => [p.id, p]));
-  return (memberships || []).map((m: any) => ({ ...m, profile: profileMap.get(m.user_id) || null }));
+  return (memberships || [])
+    .map((m: any) => ({ ...m, profile: profileMap.get(m.user_id) || null }))
+    .sort((a: any, b: any) => {
+      const ak = Number(a.profile?.karma_points || 0);
+      const bk = Number(b.profile?.karma_points || 0);
+      if (bk !== ak) return bk - ak;
+      return String(a.profile?.display_name || "").localeCompare(String(b.profile?.display_name || ""));
+    });
 }
 
 export async function updateGroupMemberRole(groupId: string, userId: string, role: "member" | "mod") {
