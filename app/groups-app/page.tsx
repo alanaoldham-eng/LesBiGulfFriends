@@ -21,14 +21,27 @@ export default function GroupsAppPage() {
   const [status, setStatus] = useState("");
 
   const refresh = async (uid: string) => {
-    const [all, mine, profile] = await Promise.all([
-      getPublicAndMemberGroups(uid).catch(() => []),
-      listMyGroups(uid).catch(() => []),
-      getMyProfile(uid).catch(() => null),
-    ]);
-    setGroups(all);
-    setMyGroups(mine);
-    setKarmaPoints(Number(profile?.karma_points || 0));
+    try {
+      const [all, mine, profile] = await Promise.all([
+        getPublicAndMemberGroups(uid),
+        listMyGroups(uid),
+        getMyProfile(uid),
+      ]);
+
+      console.log("groups all", all);
+      console.log("groups mine", mine);
+      console.log("profile", profile);
+
+      setGroups(all);
+      setMyGroups(mine);
+      setKarmaPoints(Number(profile?.karma_points || 0));
+      setStatus("");
+    } catch (e: any) {
+      console.error("Groups refresh failed:", e);
+      setStatus(e?.message || JSON.stringify(e) || "Unable to load groups.");
+      setGroups([]);
+      setMyGroups([]);
+    }
   };
 
   useEffect(() => {

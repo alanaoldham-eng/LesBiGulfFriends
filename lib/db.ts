@@ -164,16 +164,51 @@ export async function createGroup(payload: {
   return data;
 }
 
+export async function listPublicGroups() {
+  const { data, error } = await supabase
+    .from("groups")
+    .select("*")
+    .eq("is_private", false)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (error) {
+    console.error("listPublicGroups error", error);
+    throw error;
+  }
+
+  console.log("listPublicGroups data", data);
+  return data || [];
+}
+
 export async function listMyGroups(me: string) {
   const { data, error } = await supabase
     .from("group_members")
     .select("group_id")
     .eq("user_id", me);
-  if (error) throw error;
+
+  if (error) {
+    console.error("listMyGroups membership error", error);
+    throw error;
+  }
+
   const ids = (data || []).map((x: any) => x.group_id);
+  console.log("listMyGroups membership ids", ids);
+
   if (!ids.length) return [];
-  const { data: groups, error: ge } = await supabase.from("groups").select("*").in("id", ids).order("created_at", { ascending: false });
-  if (ge) throw ge;
+
+  const { data: groups, error: ge } = await supabase
+    .from("groups")
+    .select("*")
+    .in("id", ids)
+    .order("created_at", { ascending: false });
+
+  if (ge) {
+    console.error("listMyGroups groups fetch error", ge);
+    throw ge;
+  }
+
+  console.log("listMyGroups groups", groups);
   return groups || [];
 }
 
@@ -405,17 +440,6 @@ export async function spendKarmaPoint(userId: string, reason: string) {
   if (error) throw error;
 }
 
-
-export async function listPublicGroups() {
-  const { data, error } = await supabase
-    .from("groups")
-    .select("*")
-    .eq("is_private", false)
-    .order("created_at", { ascending: false })
-    .limit(100);
-  if (error) throw error;
-  return data || [];
-}
 
 export async function getPublicAndMemberGroups(userId: string) {
   const [publicGroups, myGroups] = await Promise.all([
