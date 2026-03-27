@@ -1,7 +1,7 @@
 {
   "name": "les-bi-gulf-friends-web",
   "private": true,
-  "version": "0.5.8",
+  "version": "0.5.9",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

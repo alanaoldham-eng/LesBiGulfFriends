@@ -6,7 +6,7 @@ import { ClientShell } from "../../components/ClientShell";
 import { EmptyState } from "../../components/EmptyState";
 import { getCurrentUser } from "../../lib/auth";
 import Link from "next/link";
-import { deletePublicImage, getMainGroupId, getMyProfile, hasPostedIntroduction, upsertMyProfile, uploadPublicImage, listBadgesForUser, type RelationshipStatus } from "../../lib/db";
+import { deletePublicImage, getMainGroupId, getMyProfile, hasPostedIntroduction, upsertMyProfile, uploadPublicImage, listBadgesForUser, getNotificationSettings, upsertNotificationSettings, type RelationshipStatus } from "../../lib/db";
 
 function formatKarma(value: any) {
   const num = Number(value || 0);
@@ -34,6 +34,7 @@ export default function ProfilePage() {
   const [badges, setBadges] = useState<any[]>([]);
   const [mainGroupId, setMainGroupId] = useState<string | null>(null);
   const [hasIntro, setHasIntro] = useState(false);
+  const [notificationSettings, setNotificationSettings] = useState({ email_friend_requests: false, email_private_messages: false, email_breakfast_reminders: false });
   const canAddMorePhotos = photoUrls.length < 3;
 
   useEffect(() => {
@@ -54,14 +55,20 @@ export default function ProfilePage() {
           setRelationshipStatus((profile.relationship_status as RelationshipStatus | null) || "");
           setPhotoUrls(profile.photo_urls || (profile.photo_url ? [profile.photo_url] : []));
           setKarmaPoints(Number(profile.karma_points || 0));
-          const [mainId, introPosted, badgeRows] = await Promise.all([
+          const [mainId, introPosted, badgeRows, notif] = await Promise.all([
             getMainGroupId().catch(() => null),
             hasPostedIntroduction(user.id).catch(() => false),
             listBadgesForUser(user.id).catch(() => []),
+            getNotificationSettings(user.id).catch(() => ({ email_friend_requests: false, email_private_messages: false, email_breakfast_reminders: false })),
           ]);
           setMainGroupId(mainId);
           setHasIntro(introPosted);
           setBadges(badgeRows);
+          setNotificationSettings({
+            email_friend_requests: Boolean(notif?.email_friend_requests),
+            email_private_messages: Boolean(notif?.email_private_messages),
+            email_breakfast_reminders: Boolean(notif?.email_breakfast_reminders),
+          });
           setStatus("");
         } catch {
           setStatus("Create your profile to get started.");
@@ -86,6 +93,7 @@ export default function ProfilePage() {
         photo_urls: photoUrls,
         photo_url: photoUrls[0] || null,
       });
+      await upsertNotificationSettings({ user_id: userId, ...notificationSettings });
       localStorage.setItem("lbgf_profile_started", "1");
       setStatus("Profile saved.");
     } catch (e: any) {
@@ -210,6 +218,23 @@ export default function ProfilePage() {
                   <option key={opt} value={opt}>{opt}</option>
                 ))}
               </select>
+
+
+<div style={{ display: "grid", gap: 10, border: "1px solid #f1dfe8", borderRadius: 18, padding: 12, background: "#fffafc" }}>
+  <strong>Email notifications (opt in)</strong>
+  <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+    <input type="checkbox" checked={notificationSettings.email_friend_requests} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_friend_requests: e.target.checked }))} />
+    <span>Email me when I get a friend request</span>
+  </label>
+  <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+    <input type="checkbox" checked={notificationSettings.email_private_messages} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_private_messages: e.target.checked }))} />
+    <span>Email me when I get a private message</span>
+  </label>
+  <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+    <input type="checkbox" checked={notificationSettings.email_breakfast_reminders} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_breakfast_reminders: e.target.checked }))} />
+    <span>Email me a Breakfast of Champions reminder</span>
+  </label>
+</div>
 
               <div style={{ display: "grid", gap: 10 }}>
                 <strong>Profile photos</strong>

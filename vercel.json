@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/retry-failed-invites",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/reset-breakfast-streaks",
+      "schedule": "5 0 * * *"
+    },
+    {
+      "path": "/api/cron/send-breakfast-reminders",
+      "schedule": "0 12 * * *"
     }
   ]
 }

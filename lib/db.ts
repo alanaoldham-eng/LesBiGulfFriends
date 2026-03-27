@@ -20,6 +20,13 @@ export type Profile = {
   karma_points?: number | null;
 };
 
+export type NotificationSettings = {
+  user_id: string;
+  email_friend_requests?: boolean | null;
+  email_private_messages?: boolean | null;
+  email_breakfast_reminders?: boolean | null;
+};
+
 export async function getMyProfile(userId: string) {
   const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
   if (error) throw error;
@@ -701,4 +708,78 @@ export async function hasCompleteProfile(userId: string) {
   const p = await getProfileById(userId);
   if (!p) return false;
   return Boolean((p.display_name || "").trim() && (p.bio || "").trim());
+}
+
+export async function getNotificationSettings(userId: string) {
+  const { data, error } = await supabase
+    .from("notification_settings")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data || {
+    user_id: userId,
+    email_friend_requests: false,
+    email_private_messages: false,
+    email_breakfast_reminders: false,
+  }) as NotificationSettings;
+}
+
+export async function upsertNotificationSettings(settings: NotificationSettings) {
+  const { error } = await supabase.from("notification_settings").upsert(settings);
+  if (error) throw error;
+}
+
+export async function listGames() {
+  return [
+    {
+      key: "breakfast_of_champions",
+      name: "Breakfast of Champions",
+      description: "Meditate, set your intention, earn daily karma, and build your streak.",
+    },
+  ];
+}
+
+export async function getBreakfastProgress(userId: string) {
+  const { data, error } = await supabase
+    .from("game_player_progress")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("game_key", "breakfast_of_champions")
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+export async function getBreakfastLeaderboard() {
+  const { data: progressRows, error } = await supabase
+    .from("game_player_progress")
+    .select("*")
+    .eq("game_key", "breakfast_of_champions")
+    .order("current_streak", { ascending: false })
+    .limit(500);
+  if (error) throw error;
+  const userIds = (progressRows || []).map((r: any) => r.user_id);
+  let profiles: any[] = [];
+  if (userIds.length) {
+    const { data: profs, error: pe } = await supabase
+      .from("profiles")
+      .select("id, display_name, photo_url, photo_urls")
+      .in("id", userIds);
+    if (pe) throw pe;
+    profiles = profs || [];
+  }
+  const profileMap = new Map(profiles.map((p: any) => [p.id, p]));
+  return (progressRows || []).map((row: any) => ({
+    ...row,
+    profile: profileMap.get(row.user_id) || null,
+  }));
+}
+
+export async function breakfastCheckIn(intention: string) {
+  const { data, error } = await supabase.rpc("breakfast_check_in", {
+    p_intention: intention || null,
+  });
+  if (error) throw error;
+  return data as { duplicate?: boolean; streak?: number; success?: boolean };
 }

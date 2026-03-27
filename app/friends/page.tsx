@@ -6,7 +6,17 @@ import { useEffect, useState } from "react";
 import { ClientShell } from "../../components/ClientShell";
 import { EmptyState } from "../../components/EmptyState";
 import { getCurrentUser } from "../../lib/auth";
-import { searchProfiles, sendFriendRequest, getIncomingFriendRequests, acceptFriendRequest, declineFriendRequest, listFriends } from "../../lib/db";
+import { searchProfiles, sendFriendRequest, getIncomingFriendRequests, acceptFriendRequest, declineFriendRequest, listFriends, getMyProfile } from "../../lib/db";
+
+async function sendFriendRequestEmailNotification(recipientUserId: string, requesterName: string) {
+  try {
+    await fetch("/api/notifications/friend-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipientUserId, requesterName }),
+    });
+  } catch {}
+}
 
 export default function FriendsPage() {
   const [me, setMe] = useState("");
@@ -15,6 +25,7 @@ export default function FriendsPage() {
   const [requests, setRequests] = useState<any[]>([]);
   const [friends, setFriends] = useState<any[]>([]);
   const [status, setStatus] = useState("");
+  const [myName, setMyName] = useState("A member");
 
   const refresh = async (userId: string) => {
     const [reqs, frs] = await Promise.all([
@@ -30,6 +41,8 @@ export default function FriendsPage() {
       const user = await getCurrentUser();
       if (!user) return;
       setMe(user.id);
+      const profile = await getMyProfile(user.id).catch(() => null);
+      setMyName(profile?.display_name || "A member");
       await refresh(user.id);
     };
     run();
@@ -43,8 +56,9 @@ export default function FriendsPage() {
 
   const requestFriend = async (to: string) => {
     try {
-      await sendFriendRequest(me, to);
-      setStatus("Friend request sent.");
+      const result: any = await sendFriendRequest(me, to);
+      setStatus(result?.duplicate ? "Friend request already pending." : "Friend request sent.");
+      if (!result?.duplicate) await sendFriendRequestEmailNotification(to, myName);
       await refresh(me);
     } catch (e: any) {
       setStatus(e.message || "Unable to send request.");

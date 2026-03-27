@@ -5,7 +5,17 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ClientShell } from "../../../components/ClientShell";
 import { getCurrentUser } from "../../../lib/auth";
-import { getProfileById, getFriendIds, sendFriendRequest, listBadgesForUser } from "../../../lib/db";
+import { getProfileById, getFriendIds, sendFriendRequest, listBadgesForUser, getMyProfile } from "../../../lib/db";
+
+async function sendFriendRequestEmailNotification(recipientUserId: string, requesterName: string) {
+  try {
+    await fetch("/api/notifications/friend-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipientUserId, requesterName }),
+    });
+  } catch {}
+}
 
 export default function MemberProfilePage() {
   const params = useParams<{ id: string }>();
@@ -15,6 +25,7 @@ export default function MemberProfilePage() {
   const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState("");
   const [badges, setBadges] = useState<any[]>([]);
+  const [myName, setMyName] = useState("A member");
 
   useEffect(() => {
     const run = async () => {
@@ -37,6 +48,7 @@ export default function MemberProfilePage() {
     try {
       const result: any = await sendFriendRequest(me, memberId);
       setStatus(result?.duplicate ? "Friend request already pending." : "Friend request sent.");
+      if (!result?.duplicate) await sendFriendRequestEmailNotification(memberId, myName);
     } catch (e: any) {
       setStatus(e.message || "Unable to send friend request.");
     }

@@ -456,3 +456,27 @@ This version adds:
 - badges now load on public member profile pages
 - each group now shows member karma standings in descending order
 - the member list includes all members regardless of karma amount
+
+## v059 games app and opt-in notifications
+This version adds:
+- Games screen
+- Breakfast of Champions daily game
+- daily meditation + intention check-in
+- +0.1 karma per daily check-in
+- streak tracking and streak leaderboard
+- daily streak reset flow when a user misses a day
+- opt-in email notification settings on the profile page
+- opt-in email notifications for:
+  - friend requests
+  - private messages
+  - Breakfast of Champions reminders
+- daily breakfast reminder cron route
+
+Run this migration too:
+- `supabase-v059-games-notifications.sql`
+
+Required environment variables:
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `CRON_SECRET`

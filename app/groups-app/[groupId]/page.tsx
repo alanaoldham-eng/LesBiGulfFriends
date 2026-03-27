@@ -6,6 +6,16 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ClientShell } from "../../../components/ClientShell";
 import { getCurrentUser } from "../../../lib/auth";
+
+async function sendFriendRequestEmailNotification(recipientUserId: string, requesterName: string) {
+  try {
+    await fetch("/api/notifications/friend-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipientUserId, requesterName }),
+    });
+  } catch {}
+}
 import {
   getGroupById,
   getMyGroupMembership,
@@ -18,6 +28,7 @@ import {
   getFriendIds,
   sendFriendRequest,
   reactToGroupMessage,
+  getMyProfile,
 } from "../../../lib/db";
 
 const EMOJIS = ["❤️", "👍", "😂", "🔥", "👏"];
@@ -80,6 +91,7 @@ export default function GroupThreadPage() {
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyPreview, setReplyPreview] = useState<any | null>(null);
   const [status, setStatus] = useState("");
+  const [myName, setMyName] = useState("A member");
 
   const canModerate = membership?.role === "owner" || membership?.role === "mod";
   const isOwner = membership?.role === "owner";
@@ -104,6 +116,8 @@ export default function GroupThreadPage() {
       const user = await getCurrentUser();
       if (!user) return;
       setMe(user.id);
+      const myProfile = await getMyProfile(user.id).catch(() => null);
+      setMyName(myProfile?.display_name || "A member");
       await refresh(user.id);
     };
     run();
@@ -143,6 +157,7 @@ export default function GroupThreadPage() {
       setStatus(result?.duplicate ? "Friend request already pending." : "Friend request sent.");
       if (!result?.duplicate) {
         setFriendIds(new Set<string>([...Array.from(friendIds), userId]));
+        await sendFriendRequestEmailNotification(userId, myName);
       }
     } catch (e: any) {
       setStatus(e.message || "Unable to send friend request.");

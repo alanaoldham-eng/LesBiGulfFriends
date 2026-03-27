@@ -5,7 +5,17 @@ import { useEffect, useState } from "react";
 import { ClientShell } from "../../components/ClientShell";
 import { EmptyState } from "../../components/EmptyState";
 import { getCurrentUser } from "../../lib/auth";
-import { listFriends, listDmMessages, sendDm, uploadPublicImage } from "../../lib/db";
+import { listFriends, listDmMessages, sendDm, uploadPublicImage, getMyProfile } from "../../lib/db";
+
+async function sendPrivateMessageEmailNotification(recipientUserId: string, senderName: string, snippet: string) {
+  try {
+    await fetch("/api/notifications/private-message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipientUserId, senderName, snippet }),
+    });
+  } catch {}
+}
 
 function MessageAttachment({ m, senderName }: { m: any; senderName: string }) {
   return (
@@ -43,14 +53,19 @@ export default function MessagesPage() {
   const [linkUrl, setLinkUrl] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
   const [status, setStatus] = useState("");
+  const [myName, setMyName] = useState("A member");
 
   useEffect(() => {
     const run = async () => {
       const user = await getCurrentUser();
       if (!user) return;
       setMe(user.id);
-      const frs = await listFriends(user.id).catch(() => []);
+      const [frs, myProfile] = await Promise.all([
+        listFriends(user.id).catch(() => []),
+        getMyProfile(user.id).catch(() => null),
+      ]);
       setFriends(frs);
+      setMyName(myProfile?.display_name || "A member");
     };
     run();
   }, []);
@@ -71,7 +86,9 @@ export default function MessagesPage() {
         mediaUrl = await uploadPublicImage("chat-media", me, attachment);
         mediaType = attachment.type || "application/octet-stream";
       }
+      const snippet = body.trim() || linkUrl.trim() || (attachment ? "Sent you an attachment" : "Sent you a message");
       await sendDm(me, selected.id, body.trim(), mediaUrl, mediaType, linkUrl.trim() || null);
+      await sendPrivateMessageEmailNotification(selected.id, myName, snippet.slice(0, 120));
       setBody("");
       setLinkUrl("");
       setAttachment(null);
