@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ClientShell } from "../../components/ClientShell";
 import { getCurrentUser } from "../../lib/auth";
 import { listFriends, listMyGroups, getMyProfile, listPositiveKarmaStandings, hasBreakfastCheckInToday, getBreakfastProgress } from "../../lib/db";
+import { getFeaturedContentSources, listConfessions } from "../../lib/roadmap";
 
 function formatKarma(value: any) {
   const num = Number(value || 0);
@@ -20,18 +21,22 @@ export default function AppHomePage() {
   const [standings, setStandings] = useState<any[]>([]);
   const [checkedInToday, setCheckedInToday] = useState(false);
   const [breakfastProgress, setBreakfastProgress] = useState<any | null>(null);
+  const [featuredSources, setFeaturedSources] = useState<any[]>([]);
+  const [recentConfessions, setRecentConfessions] = useState<any[]>([]);
 
   useEffect(() => {
     const run = async () => {
       const user = await getCurrentUser();
       if (!user) return;
-      const [friends, groups, profile, leaderboard, checked, progress] = await Promise.all([
+      const [friends, groups, profile, leaderboard, checked, progress, sources, confessions] = await Promise.all([
         listFriends(user.id).catch(() => []),
         listMyGroups(user.id).catch(() => []),
         getMyProfile(user.id).catch(() => null),
         listPositiveKarmaStandings(200).catch(() => []),
         hasBreakfastCheckInToday(user.id).catch(() => false),
         getBreakfastProgress(user.id).catch(() => null),
+        getFeaturedContentSources().catch(() => []),
+        listConfessions(3).catch(() => []),
       ]);
       setFriendCount(friends.length);
       setGroupCount(groups.length);
@@ -40,6 +45,8 @@ export default function AppHomePage() {
       setStandings(leaderboard);
       setCheckedInToday(checked);
       setBreakfastProgress(progress);
+      setFeaturedSources(sources);
+      setRecentConfessions(confessions);
     };
     run();
   }, []);
@@ -49,17 +56,7 @@ export default function AppHomePage() {
       <section className="hero">
         <h1 style={{ margin: 0, fontSize: 30 }}>Welcome, {name}</h1>
         <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
-          This is your connected MVP dashboard. Profiles, friends, messages, groups, games, and events are now wired for Supabase.
-        </p>
-      </section>
-
-      <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff", marginTop: 16 }}>
-        <h3 style={{ marginTop: 0 }}>Phase 2 preview</h3>
-        <p style={{ margin: 0, lineHeight: 1.7, opacity: 0.9 }}>
-          Karma is currently tracked in our database ledger so we can keep the community moving quickly in phase 1.
-          In phase 2, karma is planned to become an ERC-20 token on Base. Members will have embedded wallets tied to
-          their email address using Thirdweb, and the phase 1 karma ledger is intended to guide a future airdrop when
-          the database system is replaced by blockchain rewards.
+          Your web beta now includes games, curated content, anonymous confessions, and blind chat alongside friends, messages, groups, and events.
         </p>
       </section>
 
@@ -108,6 +105,36 @@ export default function AppHomePage() {
               {checkedInToday ? "View Breakfast of Champions" : "Check in now"}
             </Link>
             <Link className="button secondary" href="/games">Open Games</Link>
+            <Link className="button secondary" href="/games/blind-chat">Blind Chat</Link>
+          </div>
+        </section>
+
+        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
+          <h3 style={{ marginTop: 0 }}>Featured this week</h3>
+          {featuredSources.length ? featuredSources.slice(0, 2).map((source) => (
+            <div key={source.id} style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, marginBottom: 10 }}>
+              <strong>{source.title}</strong>
+              <p style={{ margin: "8px 0", opacity: 0.8 }}>{source.editorial_note || source.description || "Fresh curated content for members."}</p>
+              <Link className="button secondary" href={`/content/${source.slug}`}>Open</Link>
+            </div>
+          )) : (
+            <p style={{ margin: 0, opacity: 0.8 }}>Curated content is ready. Add your first featured source in Supabase to populate this section.</p>
+          )}
+        </section>
+
+        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
+          <h3 style={{ marginTop: 0 }}>Anonymous confessional</h3>
+          {recentConfessions.length ? recentConfessions.map((post) => (
+            <div key={post.id} style={{ borderBottom: "1px solid #f1dfe8", padding: "10px 0" }}>
+              <div style={{ fontSize: 12, opacity: 0.6 }}>Anonymous</div>
+              <div style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{post.body}</div>
+              <div style={{ marginTop: 6, fontSize: 13, opacity: 0.75 }}>{post.reply_count} replies • {post.reaction_count} reactions</div>
+            </div>
+          )) : (
+            <p style={{ margin: 0, opacity: 0.8 }}>No anonymous posts yet. Be the first to start the space.</p>
+          )}
+          <div style={{ marginTop: 12 }}>
+            <Link className="button secondary" href="/confessions">Open Confessions</Link>
           </div>
         </section>
       </div>
