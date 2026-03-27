@@ -480,3 +480,18 @@ Required environment variables:
 - `RESEND_FROM_EMAIL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `CRON_SECRET`
+
+## v060 games polish and regression fixes
+This version adds:
+- prettier Games home screen
+- in-app Breakfast of Champions reminder card on the member home page
+- automatic Breakfast of Champions streak milestone badges:
+  - 3-Day Streak
+  - 30-Day Champion
+- fixed regression where extra `</ul>` broke `app/app/page.tsx`
+- fixed public group member standings to continue listing all members
+- safer profile and notification settings saves to avoid RLS save failures on update
+- fixed import ordering regression in the group thread page
+
+Run this migration too:
+- `supabase-v060-streak-badges-profile-fixes.sql`

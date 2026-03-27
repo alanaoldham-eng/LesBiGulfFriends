@@ -40,7 +40,20 @@ export async function getProfileById(userId: string) {
 }
 
 export async function upsertMyProfile(profile: Partial<Profile> & { id: string }) {
-  const { error } = await supabase.from("profiles").upsert(profile);
+  const { data: existing, error: readError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", profile.id)
+    .maybeSingle();
+  if (readError) throw readError;
+
+  if (existing?.id) {
+    const { error } = await supabase.from("profiles").update(profile).eq("id", profile.id);
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabase.from("profiles").insert(profile);
   if (error) throw error;
 }
 
@@ -726,7 +739,32 @@ export async function getNotificationSettings(userId: string) {
 }
 
 export async function upsertNotificationSettings(settings: NotificationSettings) {
-  const { error } = await supabase.from("notification_settings").upsert(settings);
+  const { data: existing, error: readError } = await supabase
+    .from("notification_settings")
+    .select("user_id")
+    .eq("user_id", settings.user_id)
+    .maybeSingle();
+  if (readError) throw readError;
+
+  if (existing?.user_id) {
+    const { error } = await supabase
+      .from("notification_settings")
+      .update({
+        email_friend_requests: settings.email_friend_requests ?? false,
+        email_private_messages: settings.email_private_messages ?? false,
+        email_breakfast_reminders: settings.email_breakfast_reminders ?? false,
+      })
+      .eq("user_id", settings.user_id);
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabase.from("notification_settings").insert({
+    user_id: settings.user_id,
+    email_friend_requests: settings.email_friend_requests ?? false,
+    email_private_messages: settings.email_private_messages ?? false,
+    email_breakfast_reminders: settings.email_breakfast_reminders ?? false,
+  });
   if (error) throw error;
 }
 
@@ -782,4 +820,18 @@ export async function breakfastCheckIn(intention: string) {
   });
   if (error) throw error;
   return data as { duplicate?: boolean; streak?: number; success?: boolean };
+}
+
+
+export async function hasBreakfastCheckInToday(userId: string) {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("game_checkins")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("game_key", "breakfast_of_champions")
+    .eq("checkin_date", today)
+    .maybeSingle();
+  if (error) throw error;
+  return !!data;
 }

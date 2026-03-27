@@ -6,16 +6,6 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ClientShell } from "../../../components/ClientShell";
 import { getCurrentUser } from "../../../lib/auth";
-
-async function sendFriendRequestEmailNotification(recipientUserId: string, requesterName: string) {
-  try {
-    await fetch("/api/notifications/friend-request", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ recipientUserId, requesterName }),
-    });
-  } catch {}
-}
 import {
   getGroupById,
   getMyGroupMembership,
@@ -30,6 +20,17 @@ import {
   reactToGroupMessage,
   getMyProfile,
 } from "../../../lib/db";
+
+
+async function sendFriendRequestEmailNotification(recipientUserId: string, requesterName: string) {
+  try {
+    await fetch("/api/notifications/friend-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipientUserId, requesterName }),
+    });
+  } catch {}
+}
 
 const EMOJIS = ["❤️", "👍", "😂", "🔥", "👏"];
 

@@ -2,10 +2,10 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ClientShell } from "../../components/ClientShell";
 import { getCurrentUser } from "../../lib/auth";
-import Link from "next/link";
-import { listFriends, listMyGroups, getMyProfile, listPositiveKarmaStandings } from "../../lib/db";
+import { listFriends, listMyGroups, getMyProfile, listPositiveKarmaStandings, hasBreakfastCheckInToday, getBreakfastProgress } from "../../lib/db";
 
 function formatKarma(value: any) {
   const num = Number(value || 0);
@@ -18,22 +18,28 @@ export default function AppHomePage() {
   const [groupCount, setGroupCount] = useState(0);
   const [karmaPoints, setKarmaPoints] = useState(0);
   const [standings, setStandings] = useState<any[]>([]);
+  const [checkedInToday, setCheckedInToday] = useState(false);
+  const [breakfastProgress, setBreakfastProgress] = useState<any | null>(null);
 
   useEffect(() => {
     const run = async () => {
       const user = await getCurrentUser();
       if (!user) return;
-      const [friends, groups, profile, leaderboard] = await Promise.all([
+      const [friends, groups, profile, leaderboard, checked, progress] = await Promise.all([
         listFriends(user.id).catch(() => []),
         listMyGroups(user.id).catch(() => []),
         getMyProfile(user.id).catch(() => null),
         listPositiveKarmaStandings(200).catch(() => []),
+        hasBreakfastCheckInToday(user.id).catch(() => false),
+        getBreakfastProgress(user.id).catch(() => null),
       ]);
       setFriendCount(friends.length);
       setGroupCount(groups.length);
       setName(profile?.display_name || user.email?.split("@")[0] || "member");
       setKarmaPoints(Number(profile?.karma_points || 0));
       setStandings(leaderboard);
+      setCheckedInToday(checked);
+      setBreakfastProgress(progress);
     };
     run();
   }, []);
@@ -43,19 +49,19 @@ export default function AppHomePage() {
       <section className="hero">
         <h1 style={{ margin: 0, fontSize: 30 }}>Welcome, {name}</h1>
         <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
-          This is your connected MVP dashboard. Profiles, friends, messages, and group chat are now wired for Supabase.
+          This is your connected MVP dashboard. Profiles, friends, messages, groups, games, and events are now wired for Supabase.
         </p>
       </section>
 
-<section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff", marginTop: 16 }}>
-  <h3 style={{ marginTop: 0 }}>Phase 2 preview</h3>
-  <p style={{ margin: 0, lineHeight: 1.7, opacity: 0.9 }}>
-    Karma is currently tracked in our database ledger so we can keep the community moving quickly in phase 1.
-    In phase 2, karma is planned to become an ERC-20 token on Base. Members will have embedded wallets tied to
-    their email address using Thirdweb, and the phase 1 karma ledger is intended to guide a future airdrop when
-    the database system is replaced by blockchain rewards.
-  </p>
-</section>
+      <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff", marginTop: 16 }}>
+        <h3 style={{ marginTop: 0 }}>Phase 2 preview</h3>
+        <p style={{ margin: 0, lineHeight: 1.7, opacity: 0.9 }}>
+          Karma is currently tracked in our database ledger so we can keep the community moving quickly in phase 1.
+          In phase 2, karma is planned to become an ERC-20 token on Base. Members will have embedded wallets tied to
+          their email address using Thirdweb, and the phase 1 karma ledger is intended to guide a future airdrop when
+          the database system is replaced by blockchain rewards.
+        </p>
+      </section>
 
       <div className="grid">
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
@@ -65,21 +71,44 @@ export default function AppHomePage() {
             <li>{groupCount} groups</li>
             <li>{formatKarma(karmaPoints)} karma points</li>
           </ul>
+
           <div style={{ marginTop: 16 }}>
             <h4 style={{ margin: "0 0 10px" }}>Karma standings</h4>
             <div style={{ display: "grid", gap: 10 }}>
               {standings.length ? standings.map((row) => (
                 <div key={row.id} style={{ display: "flex", gap: 12, alignItems: "center", padding: 10, border: "1px solid #f1dfe8", borderRadius: 16 }}>
-                  {(row.photo_urls?.[0] || row.photo_url) ? <img src={row.photo_urls?.[0] || row.photo_url} alt={row.display_name || "Member"} style={{ width: 42, height: 42, borderRadius: 999, objectFit: "cover", border: "1px solid #ead5df" }} /> : null}
+                  {(row.photo_urls?.[0] || row.photo_url) ? (
+                    <img
+                      src={row.photo_urls?.[0] || row.photo_url}
+                      alt={row.display_name || "Member"}
+                      style={{ width: 42, height: 42, borderRadius: 999, objectFit: "cover", border: "1px solid #ead5df" }}
+                    />
+                  ) : null}
                   <div>
-                    <Link href={`/members/${row.id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>{row.display_name || "Member"}</Link>
+                    <Link href={`/members/${row.id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>
+                      {row.display_name || "Member"}
+                    </Link>
                     <div style={{ opacity: 0.8 }}>{formatKarma(row.karma_points)} karma</div>
                   </div>
                 </div>
               )) : <p style={{ margin: 0, opacity: 0.8 }}>Standings will appear when members start earning karma.</p>}
             </div>
           </div>
-            <li>Next step: wire events/check-ins after this MVP feels stable</li>
+        </section>
+
+        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
+          <h3 style={{ marginTop: 0 }}>Games reminder</h3>
+          <p style={{ opacity: 0.85, lineHeight: 1.6 }}>
+            {checkedInToday
+              ? `You already checked in for Breakfast of Champions today. Current streak: ${breakfastProgress?.current_streak || 0} 🔥`
+              : "Breakfast of Champions is waiting for you. Meditate, post your intention, and protect your streak."}
+          </p>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <Link className="button" href="/games/breakfast_of_champions">
+              {checkedInToday ? "View Breakfast of Champions" : "Check in now"}
+            </Link>
+            <Link className="button secondary" href="/games">Open Games</Link>
+          </div>
         </section>
       </div>
     </ClientShell>
