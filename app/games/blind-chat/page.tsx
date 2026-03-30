@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ClientShell } from "../../../components/ClientShell";
 import { getCurrentUser } from "../../../lib/auth";
-import { getMyBlindQueueEntry, joinBlindChatQueue, leaveBlindSession, listMyBlindSessions, tryMatchBlindChat } from "../../../lib/roadmap";
+import { getMyBlindQueueEntry, joinBlindChatQueue, listMyBlindSessions, tryMatchBlindChat } from "../../../lib/roadmap";
 
 export default function BlindChatLobbyPage() {
   const [me, setMe] = useState("");
