@@ -1,6 +1,25 @@
 {
-  "name": "lbgf-v064-web-overlay",
+  "name": "les-bi-gulf-friends-web",
   "private": true,
-  "version": "1.0.0",
-  "description": "Overlay package to bring LesBiGulfFriends web app from v60-games polish up to the current web roadmap state"
+  "version": "0.6.1",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.50.0",
+    "next": "^15.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tinacms": "^2.7.0"
+  },
+  "devDependencies": {
+    "@tinacms/cli": "^1.9.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.0"
+  }
 }
