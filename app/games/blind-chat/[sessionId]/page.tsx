@@ -3,8 +3,8 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { ClientShell } from "../../../components/ClientShell";
-import { getCurrentUser } from "../../../lib/auth";
+import { ClientShell } from "../../../../components/ClientShell";
+import { getCurrentUser } from "../../../../lib/auth";
 
 type Message = { id: string; sender: "me" | "them"; body: string; created_at: string };
 
