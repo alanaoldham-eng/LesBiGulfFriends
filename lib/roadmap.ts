@@ -388,3 +388,146 @@ export async function getGameReactionSummary(participation_id: string) {
   });
   return summary;
 }
+
+
+export async function getViewerRoleFlags(userId: string) {
+  const [{ data: profile }, { data: candidate }] = await Promise.all([
+    supabase.from("profiles").select("id, display_name, bio, photo_url, photo_urls, karma_points, membership_status").eq("id", userId).maybeSingle(),
+    supabase.from("waiting_room_candidates").select("id, status").eq("user_id", userId).maybeSingle(),
+  ]);
+  const canReview = !!profile && !!String(profile.display_name || "").trim() && !!String(profile.bio || "").trim() && (!!profile.photo_url || (profile.photo_urls || []).length > 0) && Number(profile.karma_points || 0) > 0;
+  return { profile, candidate, canReview };
+}
+
+export async function getMyWaitingRoomCandidate(userId: string) {
+  const { data, error } = await supabase.from("waiting_room_candidates").select("*").eq("user_id", userId).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function ensureWaitingRoomCandidate(userId: string) {
+  const existing = await getMyWaitingRoomCandidate(userId).catch(() => null);
+  if (existing) return existing;
+  const { data, error } = await supabase.from("waiting_room_candidates").insert({ user_id: userId, status: "waiting" }).select("*").single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateWaitingRoomIntroVideo(userId: string, intro_video_url: string) {
+  const { error } = await supabase
+    .from("waiting_room_candidates")
+    .update({ intro_video_url, intro_video_submitted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
+export async function listWaitingRoomCandidates() {
+  const { data, error } = await supabase
+    .from("waiting_room_candidates")
+    .select("*, profiles:user_id(id, display_name, bio, photo_url, photo_urls, city, membership_status)")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getWaitingRoomCandidateById(candidateId: string) {
+  const { data, error } = await supabase
+    .from("waiting_room_candidates")
+    .select("*, profiles:user_id(id, display_name, bio, photo_url, photo_urls, city, membership_status)")
+    .eq("id", candidateId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function listWaitingRoomQuestions(candidateId: string) {
+  const { data, error } = await supabase
+    .from("waiting_room_questions")
+    .select("id, candidate_id, asked_by, body, is_hidden, created_at")
+    .eq("candidate_id", candidateId)
+    .eq("is_hidden", false)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function listWaitingRoomAnswers(candidateId: string) {
+  const { data, error } = await supabase
+    .from("waiting_room_answers")
+    .select("id, question_id, candidate_id, body, video_url, created_at")
+    .eq("candidate_id", candidateId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function askWaitingRoomQuestion(candidateId: string, askedBy: string, body: string) {
+  const { error } = await supabase.from("waiting_room_questions").insert({ candidate_id: candidateId, asked_by: askedBy, body: body.trim() });
+  if (error) throw error;
+}
+
+export async function answerWaitingRoomQuestion(candidateId: string, questionId: string, body: string, video_url?: string | null) {
+  const { error } = await supabase.from("waiting_room_answers").insert({ candidate_id: candidateId, question_id: questionId, body: body.trim() || null, video_url: video_url || null });
+  if (error) throw error;
+}
+
+export async function approveWaitingRoomCandidate(candidateId: string, reviewerUserId: string) {
+  const { error } = await supabase.rpc("approve_waiting_candidate", { _candidate_id: candidateId, _reviewer_user_id: reviewerUserId });
+  if (error) throw error;
+}
+
+export async function rejectWaitingRoomCandidate(candidateId: string, reviewerUserId: string, rejectionReasonKey: string, rejectionReasonText?: string | null) {
+  const { error } = await supabase.rpc("reject_waiting_candidate_hard_delete", {
+    _candidate_id: candidateId,
+    _reviewer_user_id: reviewerUserId,
+    _rejection_reason_key: rejectionReasonKey,
+    _rejection_reason_text: rejectionReasonText || null,
+  });
+  if (error) throw error;
+}
+
+export async function listRoleplaySessions() {
+  const { data, error } = await supabase.from("roleplay_sessions").select("*").eq("status", "active").order("created_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createRoleplaySession(created_by: string) {
+  const { data, error } = await supabase.from("roleplay_sessions").insert({ created_by, status: "active" }).select("*").single();
+  if (error) throw error;
+  return data;
+}
+
+export async function joinRoleplaySession(session_id: string, user_id: string, role: "sub" | "participant", is_anonymous: boolean) {
+  const { error } = await supabase.from("roleplay_participants").upsert({ session_id, user_id, role, is_anonymous });
+  if (error) throw error;
+}
+
+export async function listRoleplayParticipants(session_id: string) {
+  const { data, error } = await supabase
+    .from("roleplay_participants")
+    .select("session_id, user_id, role, is_anonymous, joined_at")
+    .eq("session_id", session_id)
+    .order("joined_at", { ascending: true });
+  if (error) throw error;
+  if (!(data || []).length) return [];
+  const ids = (data || []).map((x: any) => x.user_id);
+  const { data: profiles } = await supabase.from("profiles").select("id, display_name, photo_url, photo_urls").in("id", ids);
+  const map = new Map((profiles || []).map((p: any) => [p.id, p]));
+  return (data || []).map((row: any) => ({ ...row, profile: map.get(row.user_id) || null }));
+}
+
+export async function listRoleplayMessages(session_id: string) {
+  const { data, error } = await supabase.from("roleplay_messages").select("*").eq("session_id", session_id).order("created_at", { ascending: true });
+  if (error) throw error;
+  if (!(data || []).length) return [];
+  const ids = (data || []).map((x: any) => x.sender_id);
+  const { data: profiles } = await supabase.from("profiles").select("id, display_name, photo_url, photo_urls").in("id", ids);
+  const map = new Map((profiles || []).map((p: any) => [p.id, p]));
+  return (data || []).map((row: any) => ({ ...row, profile: map.get(row.sender_id) || null }));
+}
+
+export async function sendRoleplayMessage(session_id: string, sender_id: string, body: string) {
+  const { error } = await supabase.from("roleplay_messages").insert({ session_id, sender_id, body: body.trim() });
+  if (error) throw error;
+}

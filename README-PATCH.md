@@ -1,24 +1,28 @@
-# Les Bi Gulf Friends v061 overlay package
+# Les Bi Gulf Friends — v064 Web Rollup Overlay
 
-This overlay is designed to be copied on top of your current `v060` repo.
+This package is an **overlay**, not a full repo export.
+Copy these files on top of your current repo, then run the SQL patch:
 
-Included:
-- group member standings visibility fix via Supabase SQL
-- curated content web pages
-- anonymous confessions web pages
-- blind chat web pages
-- expanded games hub with:
-  - This or That
-  - Daily Prompt
-  - Hot Takes
-- homepage links/cards for the new web roadmap features
-- member nav links for Curated Content and Confessions
+```bash
+sql/supabase-v064-web-rollup.sql
+```
 
-## Apply order
-1. Copy these files into your repo.
-2. Run the SQL migration in `sql/supabase-v061-web-roadmap.sql`.
-3. Deploy.
+## What is included
+- safe `admin_users` setup and no-recursion RLS foundation
+- group members/profile visibility fix
+- group messages newest-first ordering
+- Main group default flow
+- onboarding profile completion flow with generated heroic usernames
+- automatic intro post into Main after onboarding save
+- curated content pages + tables
+- anonymous confessions + reply/report tables
+- blind chat shell + tables
+- games framework + starter definitions
+- waiting room hard gate + auto post into Main group
+- consensual roleplay game (replaces dungeon concept)
+- corrected Hot Takes page
 
-## Important note
-The group standings bug is most likely caused by RLS on `group_members`, not by the React page itself.
-The included SQL fixes the select policy so all visible group members are returned to authenticated users.
+## Important notes
+- `reject_waiting_candidate_hard_delete()` attempts to delete from `auth.users`; on some Supabase projects this may still require manual cleanup in the dashboard. It logs that case into `moderation_logs`.
+- This package assumes your project already has the existing `public.profiles`, `public.groups`, `public.group_members`, `public.group_messages`, `public.karma_ledger`, and related social tables shown in your shared schema.
+- The new waiting room and roleplay routes are web-first and compile-safe against the helper files included here, but you should still run a local build before pushing to production.

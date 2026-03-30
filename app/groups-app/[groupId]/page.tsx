@@ -2,8 +2,8 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { ClientShell } from "../../../components/ClientShell";
 import { getCurrentUser } from "../../../lib/auth";
 import {
@@ -19,8 +19,9 @@ import {
   sendFriendRequest,
   reactToGroupMessage,
   getMyProfile,
+  getPublicAndMemberGroups,
+  isProfileComplete,
 } from "../../../lib/db";
-
 
 async function sendFriendRequestEmailNotification(recipientUserId: string, requesterName: string) {
   try {
@@ -33,11 +34,7 @@ async function sendFriendRequestEmailNotification(recipientUserId: string, reque
 }
 
 const EMOJIS = ["❤️", "👍", "😂", "🔥", "👏"];
-
-function formatKarma(value: any) {
-  const num = Number(value || 0);
-  return Number.isInteger(num) ? String(num) : num.toFixed(1).replace(/\.0$/, "");
-}
+function formatKarma(value: any) { const num = Number(value || 0); return Number.isInteger(num) ? String(num) : num.toFixed(1).replace(/\.0$/, ""); }
 
 function MessageCard({ m, me, friendIds, onAddFriend, onReply, onReact }: any) {
   const mainPhoto = m.profile?.photo_urls?.[0] || m.profile?.photo_url || null;
@@ -50,26 +47,16 @@ function MessageCard({ m, me, friendIds, onAddFriend, onReply, onReact }: any) {
         {mainPhoto ? <img src={mainPhoto} alt={m.profile?.display_name || "Member"} style={{ width: 38, height: 38, borderRadius: 999, objectFit: "cover", border: "1px solid #ead5df" }} /> : null}
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <Link href={`/members/${m.sender_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>
-              {m.sender_id === me ? "You" : (m.profile?.display_name || m.sender_id)}
-            </Link>
-            {m.sender_id !== me && !isFriend ? (
-              <button className="button secondary" onClick={() => onAddFriend(m.sender_id)}>Add Friend</button>
-            ) : null}
+            <Link href={`/members/${m.sender_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>{m.sender_id === me ? "You" : (m.profile?.display_name || m.sender_id)}</Link>
+            {m.sender_id !== me && !isFriend ? <button className="button secondary" onClick={() => onAddFriend(m.sender_id)}>Add Friend</button> : null}
             {m.parent_message_id ? <span style={{ opacity: 0.6, fontSize: 12 }}>Reply</span> : null}
           </div>
           {m.body ? <div style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{m.body}</div> : null}
           {m.link_url ? <div style={{ marginTop: 6 }}><a href={m.link_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>{m.link_url}</a></div> : null}
-          {m.media_url ? (
-            <div style={{ marginTop: 8 }}>
-              {String(m.media_type || "").startsWith("image/") ? <img src={m.media_url} alt="Attachment" style={{ maxWidth: "100%", borderRadius: 14, border: "1px solid #ead5df" }} /> : <a href={m.media_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>Open attachment</a>}
-            </div>
-          ) : null}
+          {m.media_url ? <div style={{ marginTop: 8 }}>{String(m.media_type || "").startsWith("image/") ? <img src={m.media_url} alt="Attachment" style={{ maxWidth: "100%", borderRadius: 14, border: "1px solid #ead5df" }} /> : <a href={m.media_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>Open attachment</a>}</div> : null}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
             <button type="button" className="button secondary" onClick={() => onReply(String(m.id))}>Reply</button>
-            {EMOJIS.map((emoji) => (
-              <button key={emoji} className="button secondary" onClick={() => onReact(m.id, emoji)}>{emoji} {grouped.get(emoji) || ""}</button>
-            ))}
+            {EMOJIS.map((emoji) => <button key={emoji} className="button secondary" onClick={() => onReact(m.id, emoji)}>{emoji} {grouped.get(emoji) || ""}</button>)}
           </div>
         </div>
       </div>
@@ -79,6 +66,7 @@ function MessageCard({ m, me, friendIds, onAddFriend, onReply, onReact }: any) {
 
 export default function GroupThreadPage() {
   const params = useParams<{ groupId: string }>();
+  const router = useRouter();
   const groupId = params.groupId;
   const [me, setMe] = useState("");
   const [group, setGroup] = useState<any | null>(null);
@@ -93,23 +81,30 @@ export default function GroupThreadPage() {
   const [replyPreview, setReplyPreview] = useState<any | null>(null);
   const [status, setStatus] = useState("");
   const [myName, setMyName] = useState("A member");
+  const [allGroups, setAllGroups] = useState<any[]>([]);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   const canModerate = membership?.role === "owner" || membership?.role === "mod";
   const isOwner = membership?.role === "owner";
 
   const refresh = async (uid: string) => {
-    const [groupRow, membershipRow, memberRows, messageRows, fids] = await Promise.all([
+    const [groupRow, membershipRow, memberRows, messageRows, fids, myProfile, groups] = await Promise.all([
       getGroupById(groupId).catch(() => null),
       getMyGroupMembership(groupId, uid).catch(() => null),
       listGroupMembers(groupId).catch(() => []),
       listGroupMessagesDetailed(groupId).catch(() => []),
       getFriendIds(uid).catch(() => new Set<string>()),
+      getMyProfile(uid).catch(() => null),
+      getPublicAndMemberGroups(uid).catch(() => []),
     ]);
     setGroup(groupRow);
     setMembership(membershipRow);
     setMembers(memberRows);
     setMessages(messageRows);
     setFriendIds(fids);
+    setMyName(myProfile?.display_name || "A member");
+    setNeedsOnboarding(!isProfileComplete(myProfile));
+    setAllGroups(groups);
   };
 
   useEffect(() => {
@@ -117,8 +112,6 @@ export default function GroupThreadPage() {
       const user = await getCurrentUser();
       if (!user) return;
       setMe(user.id);
-      const myProfile = await getMyProfile(user.id).catch(() => null);
-      setMyName(myProfile?.display_name || "A member");
       await refresh(user.id);
     };
     run();
@@ -126,8 +119,7 @@ export default function GroupThreadPage() {
 
   const handleReply = (messageId: string) => {
     setReplyTo(messageId);
-    const msg = messages.find((m: any) => String(m.id) === String(messageId)) || null;
-    setReplyPreview(msg);
+    setReplyPreview(messages.find((m: any) => String(m.id) === String(messageId)) || null);
     setStatus("Reply attached.");
   };
 
@@ -141,39 +133,19 @@ export default function GroupThreadPage() {
         mediaType = attachment.type || "application/octet-stream";
       }
       await sendGroupReply(groupId, me, body.trim(), replyTo, mediaUrl, mediaType, linkUrl.trim() || null);
-      setBody("");
-      setLinkUrl("");
-      setAttachment(null);
-      setReplyTo(null);
-      setReplyPreview(null);
+      setBody(""); setLinkUrl(""); setAttachment(null); setReplyTo(null); setReplyPreview(null);
       await refresh(me);
-    } catch (e: any) {
-      setStatus(e.message || "Unable to send group message.");
-    }
+    } catch (e: any) { setStatus(e.message || "Unable to send group message."); }
   };
 
   const addFriend = async (userId: string) => {
     try {
       const result: any = await sendFriendRequest(me, userId);
       setStatus(result?.duplicate ? "Friend request already pending." : "Friend request sent.");
-      if (!result?.duplicate) {
-        setFriendIds(new Set<string>([...Array.from(friendIds), userId]));
-        await sendFriendRequestEmailNotification(userId, myName);
-      }
-    } catch (e: any) {
-      setStatus(e.message || "Unable to send friend request.");
-    }
+      if (!result?.duplicate) { setFriendIds(new Set<string>([...Array.from(friendIds), userId])); await sendFriendRequestEmailNotification(userId, myName); }
+    } catch (e: any) { setStatus(e.message || "Unable to send friend request."); }
   };
-
-  const react = async (messageId: string, emoji: string) => {
-    try {
-      await reactToGroupMessage(groupId, messageId, me, emoji);
-      await refresh(me);
-    } catch (e: any) {
-      setStatus(e.message || "Unable to react to message.");
-    }
-  };
-
+  const react = async (messageId: string, emoji: string) => { try { await reactToGroupMessage(groupId, messageId, me, emoji); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to react to message."); } };
   const promoteToMod = async (userId: string) => { try { await updateGroupMemberRole(groupId, userId, "mod"); setStatus("Member promoted to moderator."); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to update role."); } };
   const demoteToMember = async (userId: string) => { try { await updateGroupMemberRole(groupId, userId, "member"); setStatus("Moderator changed to member."); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to update role."); } };
   const removeMemberFromGroup = async (userId: string) => { try { await removeGroupMember(groupId, userId); setStatus("Member removed."); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to remove member."); } };
@@ -182,24 +154,35 @@ export default function GroupThreadPage() {
     <ClientShell>
       <section className="hero">
         <h1 style={{ margin: 0, fontSize: 30 }}>{group?.name || "Group"}</h1>
-        <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
-          {group?.is_private ? "Private group." : "Public group."} Group messages support replies and emoji reactions.
-        </p>
+        <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>{group?.is_private ? "Private group." : "Public group."} Newest messages appear at the top. Main group is the default group for every completed member.</p>
       </section>
-
       <div className="grid">
+        {needsOnboarding ? (
+          <section style={{ border: '1px solid #e9d7e2', borderRadius: 20, padding: 16, background: '#fff7fb' }}>
+            <h3 style={{ marginTop: 0 }}>Finish your profile first</h3>
+            <p style={{ opacity: 0.85 }}>Accounts named New Member are confusing people. Add a real display name and at least one photo, then come back to the Main group to introduce yourself.</p>
+            <button className='button' onClick={() => router.push('/onboarding/profile')}>Complete profile</button>
+          </section>
+        ) : null}
+
+        <section style={{ border: '1px solid #e9d7e2', borderRadius: 20, padding: 16, background: '#fff' }}>
+          <h3 style={{ marginTop: 0 }}>Groups</h3>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {allGroups.map((g: any) => <Link key={g.id} className='button secondary' href={`/groups-app/${g.id}`}>{String(g.name || '').toLowerCase() === 'main' ? '⭐ Main' : g.name}</Link>)}
+          </div>
+          {String(group?.name || '').toLowerCase() === 'main' ? <p style={{ marginTop: 12, opacity: 0.8 }}>New here? Post your introduction below so members can welcome you.</p> : null}
+        </section>
+
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <div style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, minHeight: 220, background: "#fffafc" }}>
-            {messages.length ? messages.map((m) => (
-              <MessageCard key={m.id} m={m} me={me} friendIds={friendIds} onAddFriend={addFriend} onReply={handleReply} onReact={react} />
-            )) : <p style={{ margin: 0, opacity: 0.7 }}>No group messages yet.</p>}
+            {messages.length ? messages.map((m) => <MessageCard key={m.id} m={m} me={me} friendIds={friendIds} onAddFriend={addFriend} onReply={handleReply} onReact={react} />) : <p style={{ margin: 0, opacity: 0.7 }}>No group messages yet.</p>}
           </div>
           <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
             {replyTo ? <div style={{ opacity: 0.85, border: "1px solid #f1dfe8", borderRadius: 14, padding: 10, background: "#fffafc" }}>Replying to <strong>{replyPreview?.profile?.display_name || (replyPreview?.sender_id === me ? "You" : "member")}</strong>{replyPreview?.body ? <div style={{ marginTop: 4, opacity: 0.75, whiteSpace: "pre-wrap" }}>{replyPreview.body}</div> : null}<div style={{ marginTop: 8 }}><button type="button" className="button secondary" onClick={() => { setReplyTo(null); setReplyPreview(null); }}>Clear reply</button></div></div> : null}
-            <textarea id="message-body" name="messageBody" value={body} onChange={(e) => setBody(e.target.value)} placeholder="Type a group message" style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-            <input id="link-url" name="linkUrl" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="Optional link" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-            <input id="group-attachment" name="groupAttachment" type="file" accept="image/*,.pdf,.doc,.docx,.txt,.zip" onChange={(e) => setAttachment(e.target.files?.[0] || null)} />
-            <button className="button" onClick={send}>Send to group</button>
+            <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder={String(group?.name || '').toLowerCase() === 'main' ? 'Introduce yourself to the Main group' : 'Type a group message'} style={{ minHeight: 100, padding: '14px 16px', borderRadius: 16, border: '1px solid #d7a8bf', fontSize: 16 }} />
+            <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder='Optional link' style={{ padding: '14px 16px', borderRadius: 16, border: '1px solid #d7a8bf', fontSize: 16 }} />
+            <input type='file' accept='image/*,.pdf,.doc,.docx,.txt,.zip' onChange={(e) => setAttachment(e.target.files?.[0] || null)} />
+            <button className='button' onClick={send}>Send to group</button>
           </div>
         </section>
 
@@ -217,19 +200,12 @@ export default function GroupThreadPage() {
                     <div style={{ opacity: 0.75 }}>{m.role} • {formatKarma(m.profile?.karma_points)} karma</div>
                   </div>
                 </div>
-                {canModerate && m.user_id !== me ? (
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {isOwner && m.role === "member" ? <button className="button secondary" onClick={() => promoteToMod(m.user_id)}>Make mod</button> : null}
-                    {isOwner && m.role === "mod" ? <button className="button secondary" onClick={() => demoteToMember(m.user_id)}>Make member</button> : null}
-                    {(isOwner || (membership?.role === "mod" && m.role === "member")) ? <button className="button secondary" onClick={() => removeMemberFromGroup(m.user_id)}>Remove</button> : null}
-                  </div>
-                ) : null}
+                {canModerate && m.user_id !== me ? <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{isOwner && m.role === 'member' ? <button className='button secondary' onClick={() => promoteToMod(m.user_id)}>Make mod</button> : null}{isOwner && m.role === 'mod' ? <button className='button secondary' onClick={() => demoteToMember(m.user_id)}>Make member</button> : null}{(isOwner || (membership?.role === 'mod' && m.role === 'member')) ? <button className='button secondary' onClick={() => removeMemberFromGroup(m.user_id)}>Remove</button> : null}</div> : null}
               </div>
             </div>
           ))}
           {!members.length ? <p style={{ margin: 0, opacity: 0.75 }}>No members yet.</p> : null}
         </section>
-
         {status ? <p style={{ margin: 0, opacity: 0.8 }}>{status}</p> : null}
       </div>
     </ClientShell>

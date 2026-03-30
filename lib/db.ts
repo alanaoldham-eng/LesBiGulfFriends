@@ -164,51 +164,16 @@ export async function createGroup(payload: {
   return data;
 }
 
-export async function listPublicGroups() {
-  const { data, error } = await supabase
-    .from("groups")
-    .select("*")
-    .eq("is_private", false)
-    .order("created_at", { ascending: false })
-    .limit(100);
-
-  if (error) {
-    console.error("listPublicGroups error", error);
-    throw error;
-  }
-
-  console.log("listPublicGroups data", data);
-  return data || [];
-}
-
 export async function listMyGroups(me: string) {
   const { data, error } = await supabase
     .from("group_members")
     .select("group_id")
     .eq("user_id", me);
-
-  if (error) {
-    console.error("listMyGroups membership error", error);
-    throw error;
-  }
-
+  if (error) throw error;
   const ids = (data || []).map((x: any) => x.group_id);
-  console.log("listMyGroups membership ids", ids);
-
   if (!ids.length) return [];
-
-  const { data: groups, error: ge } = await supabase
-    .from("groups")
-    .select("*")
-    .in("id", ids)
-    .order("created_at", { ascending: false });
-
-  if (ge) {
-    console.error("listMyGroups groups fetch error", ge);
-    throw ge;
-  }
-
-  console.log("listMyGroups groups", groups);
+  const { data: groups, error: ge } = await supabase.from("groups").select("*").in("id", ids).order("created_at", { ascending: false });
+  if (ge) throw ge;
   return groups || [];
 }
 
@@ -217,7 +182,7 @@ export async function listGroupMessages(group_id: string) {
     .from("group_messages")
     .select("*")
     .eq("group_id", group_id)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .limit(300);
   if (error) throw error;
   return data || [];
@@ -441,6 +406,17 @@ export async function spendKarmaPoint(userId: string, reason: string) {
 }
 
 
+export async function listPublicGroups() {
+  const { data, error } = await supabase
+    .from("groups")
+    .select("*")
+    .eq("is_private", false)
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  return data || [];
+}
+
 export async function getPublicAndMemberGroups(userId: string) {
   const [publicGroups, myGroups] = await Promise.all([
     listPublicGroups().catch(() => []),
@@ -524,7 +500,7 @@ export async function listEventMessages(event_id: string) {
     .from("event_messages")
     .select("*")
     .eq("event_id", event_id)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .limit(300);
   if (error) throw error;
   return data || [];
@@ -858,4 +834,26 @@ export async function hasBreakfastCheckInToday(userId: string) {
     .maybeSingle();
   if (error) throw error;
   return !!data;
+}
+
+
+const HEROIC_NAME_POOL = [
+  "Athena", "Artemis", "Boudica", "Brienne", "Buffy", "Cleopatra",
+  "Diana", "Eowyn", "Freya", "JoanOfArc", "Katniss", "Lagertha",
+  "Mulan", "Nyx", "Ororo", "Ripley", "Sappho", "Storm",
+  "Valkyrie", "WonderWoman", "Xena", "Yennefer", "Hermione", "Astraea"
+];
+
+export function generateHeroicUsername() {
+  const base = HEROIC_NAME_POOL[Math.floor(Math.random() * HEROIC_NAME_POOL.length)];
+  const suffix = Math.floor(100 + Math.random() * 900);
+  return `${base}_${suffix}`;
+}
+
+export function isProfileComplete(profile: Partial<Profile> | null | undefined) {
+  if (!profile) return false;
+  const name = String(profile.display_name || "").trim();
+  const hasName = !!name && name !== "New Member";
+  const hasPhoto = !!(profile.photo_url || (profile.photo_urls && profile.photo_urls.length));
+  return hasName && hasPhoto;
 }

@@ -30,19 +30,8 @@ type HotTakeResponseRow = {
   created_at: string;
 };
 
-type ReactionSummary = {
-  like: number;
-  fun: number;
-  agree: number;
-  fire: number;
-};
-
-const EMPTY_REACTIONS: ReactionSummary = {
-  like: 0,
-  fun: 0,
-  agree: 0,
-  fire: 0,
-};
+type ReactionSummary = { like: number; fun: number; agree: number; fire: number };
+const EMPTY_REACTIONS: ReactionSummary = { like: 0, fun: 0, agree: 0, fire: 0 };
 
 export default function HotTakesPage() {
   const [me, setMe] = useState("");
@@ -56,31 +45,21 @@ export default function HotTakesPage() {
     const data = await listGameInstancesBySlug("hot-takes").catch(() => ({ instances: [] as HotTakeInstance[] }));
     const nextInstances = (data.instances || []) as HotTakeInstance[];
     setInstances(nextInstances);
-
     const nextResponses: Record<string, HotTakeResponseRow[]> = {};
     const nextCounts: Record<string, ReactionSummary> = {};
-
     for (const instance of nextInstances) {
-      const rows = (await listGameParticipation(instance.id, instance.is_anonymous).catch(
-        () => []
-      )) as HotTakeResponseRow[];
-
+      const rows = (await listGameParticipation(instance.id, instance.is_anonymous).catch(() => [])) as HotTakeResponseRow[];
       nextResponses[instance.id] = rows;
-
       for (const row of rows) {
-        const summary = await getGameReactionSummary(row.id).catch(
-          () => EMPTY_REACTIONS
-        );
-
+        const summary = await getGameReactionSummary(row.id).catch(() => EMPTY_REACTIONS);
         nextCounts[row.id] = {
-          like: Number(summary?.like || 0),
-          fun: Number(summary?.fun || 0),
-          agree: Number(summary?.agree || 0),
-          fire: Number(summary?.fire || 0),
+          like: Number((summary as any)?.like || 0),
+          fun: Number((summary as any)?.fun || 0),
+          agree: Number((summary as any)?.agree || 0),
+          fire: Number((summary as any)?.fire || 0),
         };
       }
     }
-
     setResponses(nextResponses);
     setReactionCounts(nextCounts);
   };
@@ -94,13 +73,7 @@ export default function HotTakesPage() {
 
   const submit = async (instanceId: string, choiceKey: string) => {
     try {
-      await upsertGameParticipation({
-        game_instance_id: instanceId,
-        user_id: me,
-        choice_key: choiceKey,
-        response_text: drafts[instanceId] || null,
-        is_anonymous: true,
-      });
+      await upsertGameParticipation({ game_instance_id: instanceId, user_id: me, choice_key: choiceKey, response_text: drafts[instanceId] || null, is_anonymous: true });
       setDrafts((prev) => ({ ...prev, [instanceId]: "" }));
       setStatus("Hot take response saved.");
       await refresh();
@@ -131,86 +104,35 @@ export default function HotTakesPage() {
     <ClientShell>
       <section className="hero">
         <h1 style={{ margin: 0, fontSize: 30 }}>Hot Takes</h1>
-        <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
-          Short opinions, reactions, and discussion. Anonymous mode stays on by default here.
-        </p>
+        <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>Short opinions, reactions, and discussion. Anonymous mode stays on by default here.</p>
       </section>
-
       <div className="grid">
         {instances.map((instance) => (
-          <section
-            key={instance.id}
-            style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}
-          >
+          <section key={instance.id} style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
             <h3 style={{ marginTop: 0 }}>{instance.title}</h3>
             <p style={{ opacity: 0.8 }}>{instance.body}</p>
-
-            <textarea
-              value={drafts[instance.id] || ""}
-              onChange={(e) =>
-                setDrafts((prev) => ({ ...prev, [instance.id]: e.target.value }))
-              }
-              placeholder="Optional short response"
-              style={{
-                width: "100%",
-                minHeight: 100,
-                padding: "14px 16px",
-                borderRadius: 16,
-                border: "1px solid #d7a8bf",
-                fontSize: 16,
-              }}
-            />
-
+            <textarea value={drafts[instance.id] || ""} onChange={(e) => setDrafts((prev) => ({ ...prev, [instance.id]: e.target.value }))} placeholder="Optional short response" style={{ width: "100%", minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
-              <button className="button secondary" onClick={() => submit(instance.id, "agree")}>
-                Agree
-              </button>
-              <button className="button secondary" onClick={() => submit(instance.id, "disagree")}>
-                Disagree
-              </button>
+              <button className="button secondary" onClick={() => submit(instance.id, "agree")}>Agree</button>
+              <button className="button secondary" onClick={() => submit(instance.id, "disagree")}>Disagree</button>
             </div>
-
             <h4 style={{ marginTop: 18 }}>Responses</h4>
-            {(responses[instance.id] || []).length ? (
-              (responses[instance.id] || []).map((row) => (
-                <div key={row.id} style={{ borderBottom: "1px solid #f1dfe8", padding: "10px 0" }}>
-                  <div style={{ fontSize: 12, opacity: 0.6 }}>
-                    {row.is_anonymous ? "Anonymous" : row.user_id || "Member"}
-                  </div>
-                  <div style={{ fontWeight: 700, marginTop: 4 }}>
-                    {row.choice_key === "agree"
-                      ? "Agrees"
-                      : row.choice_key === "disagree"
-                        ? "Disagrees"
-                        : "Responded"}
-                  </div>
-                  {row.response_text ? <div style={{ marginTop: 4 }}>{row.response_text}</div> : null}
-
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-                    <button className="button secondary" onClick={() => react(row.id, "like")}>
-                      👍 {reactionCounts[row.id]?.like || ""}
-                    </button>
-                    <button className="button secondary" onClick={() => react(row.id, "fun")}>
-                      😂 {reactionCounts[row.id]?.fun || ""}
-                    </button>
-                    <button className="button secondary" onClick={() => react(row.id, "agree")}>
-                      💬 {reactionCounts[row.id]?.agree || ""}
-                    </button>
-                    <button className="button secondary" onClick={() => react(row.id, "fire")}>
-                      🔥 {reactionCounts[row.id]?.fire || ""}
-                    </button>
-                    <button className="button secondary" onClick={() => report(row.id)}>
-                      Report
-                    </button>
-                  </div>
+            {(responses[instance.id] || []).length ? (responses[instance.id] || []).map((row) => (
+              <div key={row.id} style={{ borderBottom: "1px solid #f1dfe8", padding: "10px 0" }}>
+                <div style={{ fontSize: 12, opacity: 0.6 }}>{row.is_anonymous ? "Anonymous" : row.user_id || "Member"}</div>
+                <div style={{ fontWeight: 700, marginTop: 4 }}>{row.choice_key === "agree" ? "Agrees" : row.choice_key === "disagree" ? "Disagrees" : "Responded"}</div>
+                {row.response_text ? <div style={{ marginTop: 4 }}>{row.response_text}</div> : null}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                  <button className="button secondary" onClick={() => react(row.id, "like")}>👍 {reactionCounts[row.id]?.like || ""}</button>
+                  <button className="button secondary" onClick={() => react(row.id, "fun")}>😂 {reactionCounts[row.id]?.fun || ""}</button>
+                  <button className="button secondary" onClick={() => react(row.id, "agree")}>💬 {reactionCounts[row.id]?.agree || ""}</button>
+                  <button className="button secondary" onClick={() => react(row.id, "fire")}>🔥 {reactionCounts[row.id]?.fire || ""}</button>
+                  <button className="button secondary" onClick={() => report(row.id)}>Report</button>
                 </div>
-              ))
-            ) : (
-              <p style={{ margin: 0, opacity: 0.8 }}>No responses yet.</p>
-            )}
+              </div>
+            )) : <p style={{ margin: 0, opacity: 0.8 }}>No responses yet.</p>}
           </section>
         ))}
-
         {!instances.length ? <p style={{ margin: 0, opacity: 0.8 }}>No active hot takes yet.</p> : null}
         {status ? <p style={{ margin: 0, opacity: 0.8 }}>{status}</p> : null}
       </div>
