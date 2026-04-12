@@ -25,6 +25,8 @@ export type NotificationSettings = {
   email_friend_requests?: boolean | null;
   email_private_messages?: boolean | null;
   email_breakfast_reminders?: boolean | null;
+  in_app_friend_requests?: boolean | null;
+  in_app_private_messages?: boolean | null;
 };
 
 export async function getMyProfile(userId: string) {
@@ -424,7 +426,28 @@ export async function getPublicAndMemberGroups(userId: string) {
   ]);
   const map = new Map<string, any>();
   [...publicGroups, ...myGroups].forEach((g: any) => map.set(g.id, g));
-  return Array.from(map.values()).sort((a: any, b: any) => (a.created_at < b.created_at ? 1 : -1));
+  const groups = Array.from(map.values());
+  if (!groups.length) return groups;
+  const groupIds = groups.map((g: any) => g.id);
+  const { data: latestMessages } = await supabase
+    .from("group_messages")
+    .select("group_id, created_at")
+    .in("group_id", groupIds)
+    .order("created_at", { ascending: false });
+  const latestByGroup = new Map<string, string>();
+  (latestMessages || []).forEach((row: any) => {
+    if (!latestByGroup.has(row.group_id)) latestByGroup.set(row.group_id, row.created_at);
+  });
+  return groups.sort((a: any, b: any) => {
+    const aMain = String(a.name || "").toLowerCase() === "main";
+    const bMain = String(b.name || "").toLowerCase() === "main";
+    if (aMain && !bMain) return -1;
+    if (!aMain && bMain) return 1;
+    const aActivity = latestByGroup.get(a.id) || a.created_at || "";
+    const bActivity = latestByGroup.get(b.id) || b.created_at || "";
+    if (aActivity !== bActivity) return aActivity < bActivity ? 1 : -1;
+    return String(a.name || "").localeCompare(String(b.name || ""));
+  });
 }
 
 export async function getFriendIds(me: string): Promise<Set<string>> {
@@ -735,6 +758,8 @@ export async function getNotificationSettings(userId: string) {
     email_friend_requests: false,
     email_private_messages: false,
     email_breakfast_reminders: false,
+    in_app_friend_requests: true,
+    in_app_private_messages: true,
   }) as NotificationSettings;
 }
 
@@ -753,6 +778,8 @@ export async function upsertNotificationSettings(settings: NotificationSettings)
         email_friend_requests: settings.email_friend_requests ?? false,
         email_private_messages: settings.email_private_messages ?? false,
         email_breakfast_reminders: settings.email_breakfast_reminders ?? false,
+        in_app_friend_requests: settings.in_app_friend_requests ?? true,
+        in_app_private_messages: settings.in_app_private_messages ?? true,
       })
       .eq("user_id", settings.user_id);
     if (error) throw error;
@@ -764,8 +791,66 @@ export async function upsertNotificationSettings(settings: NotificationSettings)
     email_friend_requests: settings.email_friend_requests ?? false,
     email_private_messages: settings.email_private_messages ?? false,
     email_breakfast_reminders: settings.email_breakfast_reminders ?? false,
+    in_app_friend_requests: settings.in_app_friend_requests ?? true,
+    in_app_private_messages: settings.in_app_private_messages ?? true,
   });
   if (error) throw error;
+}
+
+export async function listInAppNotifications(userId: string) {
+  const settings = await getNotificationSettings(userId).catch(() => null);
+  const notifications: Array<{ id: string; type: string; text: string; href: string; created_at: string }> = [];
+
+  if (settings?.in_app_friend_requests ?? true) {
+    const { data: reqs } = await supabase
+      .from("friend_requests")
+      .select("id, from_user, created_at, status")
+      .eq("to_user", userId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    const senderIds = (reqs || []).map((r: any) => r.from_user);
+    let names = new Map<string, string>();
+    if (senderIds.length) {
+      const { data: profiles } = await supabase.from("profiles").select("id, display_name").in("id", senderIds);
+      names = new Map((profiles || []).map((p: any) => [p.id, p.display_name || "A member"]));
+    }
+    (reqs || []).forEach((r: any) => {
+      notifications.push({
+        id: `fr-${r.id}`,
+        type: "friend_request",
+        text: `${names.get(r.from_user) || "A member"} sent you a friend request`,
+        href: "/friends",
+        created_at: r.created_at,
+      });
+    });
+  }
+
+  if (settings?.in_app_private_messages ?? true) {
+    const { data: msgs } = await supabase
+      .from("messages")
+      .select("id, sender_id, created_at")
+      .eq("recipient_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    const senderIds = [...new Set((msgs || []).map((m: any) => m.sender_id))];
+    let names = new Map<string, string>();
+    if (senderIds.length) {
+      const { data: profiles } = await supabase.from("profiles").select("id, display_name").in("id", senderIds);
+      names = new Map((profiles || []).map((p: any) => [p.id, p.display_name || "A member"]));
+    }
+    (msgs || []).forEach((m: any) => {
+      notifications.push({
+        id: `dm-${m.id}`,
+        type: "private_message",
+        text: `New message from ${names.get(m.sender_id) || "a member"}`,
+        href: "/messages",
+        created_at: m.created_at,
+      });
+    });
+  }
+
+  return notifications.sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, 25);
 }
 
 export async function listGames() {

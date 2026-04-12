@@ -34,13 +34,15 @@ async function sendFriendRequestEmailNotification(recipientUserId: string, reque
 }
 
 const EMOJIS = ["❤️", "👍", "😂", "🔥", "👏"];
+const PAGE_SIZE = 12;
 function formatKarma(value: any) { const num = Number(value || 0); return Number.isInteger(num) ? String(num) : num.toFixed(1).replace(/\.0$/, ""); }
 
-function MessageCard({ m, me, friendIds, onAddFriend, onReply, onReact }: any) {
+function MessageCard({ m, me, friendIds, onAddFriend, onReplyStart, onReplyCancel, onReplySend, onReact, openReplyId, draftReply, setDraftReply, attachment, setAttachment, linkUrl, setLinkUrl, collapsed, toggleCollapse }: any) {
   const mainPhoto = m.profile?.photo_urls?.[0] || m.profile?.photo_url || null;
   const isFriend = friendIds.has(m.sender_id);
   const grouped = new Map<string, number>();
   (m.reactions || []).forEach((r: any) => grouped.set(r.emoji, (grouped.get(r.emoji) || 0) + 1));
+  const isOpen = openReplyId === String(m.id);
   return (
     <div style={{ marginBottom: 14, paddingLeft: m.parent_message_id ? 20 : 0, borderLeft: m.parent_message_id ? "3px solid #f1dfe8" : "none" }}>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
@@ -49,15 +51,26 @@ function MessageCard({ m, me, friendIds, onAddFriend, onReply, onReact }: any) {
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <Link href={`/members/${m.sender_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>{m.sender_id === me ? "You" : (m.profile?.display_name || m.sender_id)}</Link>
             {m.sender_id !== me && !isFriend ? <button className="button secondary" onClick={() => onAddFriend(m.sender_id)}>Add Friend</button> : null}
-            {m.parent_message_id ? <span style={{ opacity: 0.6, fontSize: 12 }}>Reply</span> : null}
+            {m.children?.length ? <button className="button secondary" onClick={() => toggleCollapse(String(m.id))}>{collapsed ? "Expand thread" : "Collapse thread"} ({m.children.length})</button> : null}
           </div>
           {m.body ? <div style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{m.body}</div> : null}
           {m.link_url ? <div style={{ marginTop: 6 }}><a href={m.link_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>{m.link_url}</a></div> : null}
           {m.media_url ? <div style={{ marginTop: 8 }}>{String(m.media_type || "").startsWith("image/") ? <img src={m.media_url} alt="Attachment" style={{ maxWidth: "100%", borderRadius: 14, border: "1px solid #ead5df" }} /> : <a href={m.media_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>Open attachment</a>}</div> : null}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
-            <button type="button" className="button secondary" onClick={() => onReply(String(m.id))}>Reply</button>
+            <button type="button" className="button secondary" onClick={() => onReplyStart(String(m.id))}>Reply</button>
             {EMOJIS.map((emoji) => <button key={emoji} className="button secondary" onClick={() => onReact(m.id, emoji)}>{emoji} {grouped.get(emoji) || ""}</button>)}
           </div>
+          {isOpen ? (
+            <div style={{ marginTop: 10, display: "grid", gap: 10, border: "1px solid #f1dfe8", borderRadius: 14, padding: 10, background: "#fffafc" }}>
+              <textarea value={draftReply} onChange={(e) => setDraftReply(e.target.value)} placeholder="Write your reply" style={{ minHeight: 90, padding: '12px 14px', borderRadius: 12, border: '1px solid #d7a8bf', fontSize: 15 }} />
+              <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder='Optional link' style={{ padding: '10px 12px', borderRadius: 12, border: '1px solid #d7a8bf', fontSize: 14 }} />
+              <input type='file' accept='image/*,.pdf,.doc,.docx,.txt,.zip' onChange={(e) => setAttachment(e.target.files?.[0] || null)} />
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button className="button" onClick={() => onReplySend(String(m.id))}>Send reply</button>
+                <button className="button secondary" onClick={onReplyCancel}>Cancel</button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -78,11 +91,15 @@ export default function GroupThreadPage() {
   const [linkUrl, setLinkUrl] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
   const [replyTo, setReplyTo] = useState<string | null>(null);
-  const [replyPreview, setReplyPreview] = useState<any | null>(null);
+  const [replyBody, setReplyBody] = useState("");
+  const [replyLinkUrl, setReplyLinkUrl] = useState("");
+  const [replyAttachment, setReplyAttachment] = useState<File | null>(null);
   const [status, setStatus] = useState("");
   const [myName, setMyName] = useState("A member");
   const [allGroups, setAllGroups] = useState<any[]>([]);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [page, setPage] = useState(1);
+  const [collapsedThreads, setCollapsedThreads] = useState<Set<string>>(new Set());
 
   const canModerate = membership?.role === "owner" || membership?.role === "mod";
   const isOwner = membership?.role === "owner";
@@ -117,10 +134,60 @@ export default function GroupThreadPage() {
     run();
   }, [groupId]);
 
-  const handleReply = (messageId: string) => {
-    setReplyTo(messageId);
-    setReplyPreview(messages.find((m: any) => String(m.id) === String(messageId)) || null);
-    setStatus("Reply attached.");
+  const messageTree = useMemo(() => {
+    const nodes = new Map<string, any>();
+    messages.forEach((m: any) => nodes.set(String(m.id), { ...m, children: [] }));
+    const roots: any[] = [];
+    nodes.forEach((node: any) => {
+      const parentId = node.parent_message_id ? String(node.parent_message_id) : null;
+      if (parentId && nodes.has(parentId)) nodes.get(parentId).children.push(node);
+      else roots.push(node);
+    });
+    const sortDesc = (arr: any[]) => {
+      arr.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+      arr.forEach((item) => sortDesc(item.children || []));
+    };
+    sortDesc(roots);
+    return roots;
+  }, [messages]);
+
+  const paginatedRoots = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return messageTree.slice(start, start + PAGE_SIZE);
+  }, [messageTree, page]);
+
+  const totalPages = Math.max(1, Math.ceil(messageTree.length / PAGE_SIZE));
+
+  const renderThread = (node: any): any => {
+    const isCollapsed = collapsedThreads.has(String(node.id));
+    return (
+      <div key={node.id}>
+        <MessageCard
+          m={node}
+          me={me}
+          friendIds={friendIds}
+          onAddFriend={addFriend}
+          onReplyStart={(id: string) => { setReplyTo(id); setStatus("Replying inline."); }}
+          onReplyCancel={() => { setReplyTo(null); setReplyBody(""); setReplyLinkUrl(""); setReplyAttachment(null); }}
+          onReplySend={sendReply}
+          onReact={react}
+          openReplyId={replyTo}
+          draftReply={replyBody}
+          setDraftReply={setReplyBody}
+          attachment={replyAttachment}
+          setAttachment={setReplyAttachment}
+          linkUrl={replyLinkUrl}
+          setLinkUrl={setReplyLinkUrl}
+          collapsed={isCollapsed}
+          toggleCollapse={(id: string) => setCollapsedThreads((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+          })}
+        />
+        {!isCollapsed ? (node.children || []).map((child: any) => renderThread(child)) : null}
+      </div>
+    );
   };
 
   const send = async () => {
@@ -132,10 +199,25 @@ export default function GroupThreadPage() {
         mediaUrl = await uploadPublicImage("chat-media", me, attachment);
         mediaType = attachment.type || "application/octet-stream";
       }
-      await sendGroupReply(groupId, me, body.trim(), replyTo, mediaUrl, mediaType, linkUrl.trim() || null);
-      setBody(""); setLinkUrl(""); setAttachment(null); setReplyTo(null); setReplyPreview(null);
+      await sendGroupReply(groupId, me, body.trim(), null, mediaUrl, mediaType, linkUrl.trim() || null);
+      setBody(""); setLinkUrl(""); setAttachment(null);
       await refresh(me);
     } catch (e: any) { setStatus(e.message || "Unable to send group message."); }
+  };
+
+  const sendReply = async (parentMessageId: string) => {
+    if (!replyBody.trim() && !replyLinkUrl.trim() && !replyAttachment) return;
+    try {
+      let mediaUrl: string | null = null;
+      let mediaType: string | null = null;
+      if (replyAttachment) {
+        mediaUrl = await uploadPublicImage("chat-media", me, replyAttachment);
+        mediaType = replyAttachment.type || "application/octet-stream";
+      }
+      await sendGroupReply(groupId, me, replyBody.trim(), parentMessageId, mediaUrl, mediaType, replyLinkUrl.trim() || null);
+      setReplyTo(null); setReplyBody(""); setReplyLinkUrl(""); setReplyAttachment(null);
+      await refresh(me);
+    } catch (e: any) { setStatus(e.message || "Unable to send group reply."); }
   };
 
   const addFriend = async (userId: string) => {
@@ -154,7 +236,7 @@ export default function GroupThreadPage() {
     <ClientShell>
       <section className="hero">
         <h1 style={{ margin: 0, fontSize: 30 }}>{group?.name || "Group"}</h1>
-        <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>{group?.is_private ? "Private group." : "Public group."} Newest messages appear at the top. Main group is the default group for every completed member.</p>
+        <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>{group?.is_private ? "Private group." : "Public group."} Main group is always pinned first and other groups are sorted by latest activity.</p>
       </section>
       <div className="grid">
         {needsOnboarding ? (
@@ -170,19 +252,30 @@ export default function GroupThreadPage() {
           <div style={{ display: 'grid', gap: 8 }}>
             {allGroups.map((g: any) => <Link key={g.id} className='button secondary' href={`/groups-app/${g.id}`}>{String(g.name || '').toLowerCase() === 'main' ? '⭐ Main' : g.name}</Link>)}
           </div>
-          {String(group?.name || '').toLowerCase() === 'main' ? <p style={{ marginTop: 12, opacity: 0.8 }}>New here? Post your introduction below so members can welcome you.</p> : null}
+          {String(group?.name || '').toLowerCase() === 'main' ? <p style={{ marginTop: 12, opacity: 0.8 }}>New here? Post your introduction in the composer below.</p> : null}
         </section>
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
-          <div style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, minHeight: 220, background: "#fffafc" }}>
-            {messages.length ? messages.map((m) => <MessageCard key={m.id} m={m} me={me} friendIds={friendIds} onAddFriend={addFriend} onReply={handleReply} onReact={react} />) : <p style={{ margin: 0, opacity: 0.7 }}>No group messages yet.</p>}
-          </div>
-          <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-            {replyTo ? <div style={{ opacity: 0.85, border: "1px solid #f1dfe8", borderRadius: 14, padding: 10, background: "#fffafc" }}>Replying to <strong>{replyPreview?.profile?.display_name || (replyPreview?.sender_id === me ? "You" : "member")}</strong>{replyPreview?.body ? <div style={{ marginTop: 4, opacity: 0.75, whiteSpace: "pre-wrap" }}>{replyPreview.body}</div> : null}<div style={{ marginTop: 8 }}><button type="button" className="button secondary" onClick={() => { setReplyTo(null); setReplyPreview(null); }}>Clear reply</button></div></div> : null}
+          <h3 style={{ marginTop: 0 }}>New post</h3>
+          <div style={{ display: "grid", gap: 12 }}>
             <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder={String(group?.name || '').toLowerCase() === 'main' ? 'Introduce yourself to the Main group' : 'Type a group message'} style={{ minHeight: 100, padding: '14px 16px', borderRadius: 16, border: '1px solid #d7a8bf', fontSize: 16 }} />
             <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder='Optional link' style={{ padding: '14px 16px', borderRadius: 16, border: '1px solid #d7a8bf', fontSize: 16 }} />
             <input type='file' accept='image/*,.pdf,.doc,.docx,.txt,.zip' onChange={(e) => setAttachment(e.target.files?.[0] || null)} />
             <button className='button' onClick={send}>Send to group</button>
+          </div>
+        </section>
+
+        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <h3 style={{ margin: 0 }}>Threads</h3>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="button secondary" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Previous</button>
+              <span style={{ alignSelf: "center", opacity: 0.75 }}>Page {page} of {totalPages}</span>
+              <button className="button secondary" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Next</button>
+            </div>
+          </div>
+          <div style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, minHeight: 220, background: "#fffafc", marginTop: 10 }}>
+            {paginatedRoots.length ? paginatedRoots.map((m) => renderThread(m)) : <p style={{ margin: 0, opacity: 0.7 }}>No group messages yet.</p>}
           </div>
         </section>
 

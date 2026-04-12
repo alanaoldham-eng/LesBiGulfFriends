@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { ClientShell } from "../../components/ClientShell";
 import { EmptyState } from "../../components/EmptyState";
 import { getCurrentUser } from "../../lib/auth";
-import { searchProfiles, sendFriendRequest, getIncomingFriendRequests, acceptFriendRequest, declineFriendRequest, listFriends, getMyProfile } from "../../lib/db";
+import { searchProfiles, sendFriendRequest, getIncomingFriendRequests, acceptFriendRequest, declineFriendRequest, listFriends, getMyProfile, listMyInvites } from "../../lib/db";
 
 async function sendFriendRequestEmailNotification(recipientUserId: string, requesterName: string) {
   try {
@@ -26,14 +26,17 @@ export default function FriendsPage() {
   const [friends, setFriends] = useState<any[]>([]);
   const [status, setStatus] = useState("");
   const [myName, setMyName] = useState("A member");
+  const [invites, setInvites] = useState<any[]>([]);
 
   const refresh = async (userId: string) => {
-    const [reqs, frs] = await Promise.all([
+    const [reqs, frs, myInvites] = await Promise.all([
       getIncomingFriendRequests(userId).catch(() => []),
       listFriends(userId).catch(() => []),
+      listMyInvites(userId).catch(() => []),
     ]);
     setRequests(reqs);
     setFriends(frs);
+    setInvites(myInvites);
   };
 
   useEffect(() => {
@@ -88,9 +91,9 @@ export default function FriendsPage() {
   return (
     <ClientShell>
       <section className="hero">
-        <h1 style={{ margin: 0, fontSize: 30 }}>Friends</h1>
+        <h1 style={{ margin: 0, fontSize: 30 }}>Friends & Invites</h1>
         <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
-          Search profiles, send friend requests, and accept incoming requests. DMs only work after friendship.
+          Search profiles, send friend requests, accept incoming requests, and track your pending invites in one place.
         </p>
       </section>
 
@@ -131,6 +134,20 @@ export default function FriendsPage() {
               <button className="button secondary" onClick={() => decline(r.id)}>Decline</button>
             </div>
           )) : <EmptyState title="No incoming requests" body="When someone sends you a request, it will show up here." />}
+        </section>
+
+        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
+          <h3 style={{ marginTop: 0 }}>Your invites</h3>
+          {invites.length ? (
+            <ul style={{ lineHeight: 1.8, paddingLeft: 18, margin: 0 }}>
+              {invites.map((inv) => <li key={inv.id}>{inv.invitee_email} <span style={{ opacity: 0.7 }}>({inv.status})</span></li>)}
+            </ul>
+          ) : (
+            <EmptyState title="No invites yet" body="When you invite someone by email, it will appear here." />
+          )}
+          <div style={{ marginTop: 10 }}>
+            <Link href="/invites" className="button secondary">Manage invites</Link>
+          </div>
         </section>
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
