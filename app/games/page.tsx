@@ -46,6 +46,12 @@ export default function GamesPage() {
           <p style={{ opacity: 0.85, lineHeight: 1.7 }}>A consensual BDSM-themed opt-in roleplay game. Participants can join anonymously or reveal their profile.</p>
           <Link className="button secondary" href="/games/roleplay">Open roleplay game</Link>
         </section>
+        <section style={{ border: "1px solid #e9d7e2", borderRadius: 24, padding: 20, background: "#fff" }}>
+          <div style={{ fontSize: 34, marginBottom: 8 }}>🫣</div>
+          <h3 style={{ marginTop: 0 }}>Anonymous Confessions</h3>
+          <p style={{ opacity: 0.85, lineHeight: 1.7 }}>Share a confession anonymously and read what others are saying, all from inside the Games hub.</p>
+          <Link className="button secondary" href="/confessions">Open confessions</Link>
+        </section>
         {games.filter((g) => ["this-or-that", "daily-prompt", "hot-takes"].includes(g.slug)).map((game) => (
           <section key={game.id} style={{ border: "1px solid #e9d7e2", borderRadius: 24, padding: 20, background: "#fff" }}>
             <h3 style={{ marginTop: 0 }}>{game.name}</h3>

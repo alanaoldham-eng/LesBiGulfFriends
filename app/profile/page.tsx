@@ -34,7 +34,7 @@ export default function ProfilePage() {
   const [badges, setBadges] = useState<any[]>([]);
   const [mainGroupId, setMainGroupId] = useState<string | null>(null);
   const [hasIntro, setHasIntro] = useState(false);
-  const [notificationSettings, setNotificationSettings] = useState({ email_friend_requests: false, email_private_messages: false, email_breakfast_reminders: false });
+  const [notificationSettings, setNotificationSettings] = useState({ email_friend_requests: false, email_private_messages: false, email_breakfast_reminders: false, in_app_friend_requests: true, in_app_private_messages: true });
   const canAddMorePhotos = photoUrls.length < 3;
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export default function ProfilePage() {
             getMainGroupId().catch(() => null),
             hasPostedIntroduction(user.id).catch(() => false),
             listBadgesForUser(user.id).catch(() => []),
-            getNotificationSettings(user.id).catch(() => ({ email_friend_requests: false, email_private_messages: false, email_breakfast_reminders: false })),
+            getNotificationSettings(user.id).catch(() => ({ email_friend_requests: false, email_private_messages: false, email_breakfast_reminders: false, in_app_friend_requests: true, in_app_private_messages: true })),
           ]);
           setMainGroupId(mainId);
           setHasIntro(introPosted);
@@ -68,6 +68,8 @@ export default function ProfilePage() {
             email_friend_requests: Boolean(notif?.email_friend_requests),
             email_private_messages: Boolean(notif?.email_private_messages),
             email_breakfast_reminders: Boolean(notif?.email_breakfast_reminders),
+            in_app_friend_requests: Boolean(notif?.in_app_friend_requests ?? true),
+            in_app_private_messages: Boolean(notif?.in_app_private_messages ?? true),
           });
           setStatus("");
         } catch {
@@ -233,6 +235,18 @@ export default function ProfilePage() {
   <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
     <input type="checkbox" checked={notificationSettings.email_breakfast_reminders} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_breakfast_reminders: e.target.checked }))} />
     <span>Email me a Breakfast of Champions reminder</span>
+  </label>
+</div>
+
+<div style={{ display: "grid", gap: 10, border: "1px solid #f1dfe8", borderRadius: 18, padding: 12, background: "#fffafc" }}>
+  <strong>In-app notifications (opt in)</strong>
+  <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+    <input type="checkbox" checked={notificationSettings.in_app_friend_requests} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, in_app_friend_requests: e.target.checked }))} />
+    <span>Show in-app notifications for friend requests</span>
+  </label>
+  <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+    <input type="checkbox" checked={notificationSettings.in_app_private_messages} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, in_app_private_messages: e.target.checked }))} />
+    <span>Show in-app notifications for private messages</span>
   </label>
 </div>
 
