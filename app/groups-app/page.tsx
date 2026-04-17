@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { ClientShell } from "../../components/ClientShell";
 import { getCurrentUser } from "../../lib/auth";
 import { getMyProfile, getPublicAndMemberGroups, isProfileComplete } from "../../lib/db";
-import { canAccessCommunity, ensureWaitingRoomCandidate } from "../../lib/community";
 
 export default function GroupsAppPage() {
   const router = useRouter();
@@ -14,13 +13,6 @@ export default function GroupsAppPage() {
     const run = async () => {
       const user = await getCurrentUser().catch(() => null);
       if (!user) return;
-
-      const access = await canAccessCommunity({ userId: user.id, email: user.email }).catch(() => null);
-      if (!access?.allowed) {
-        await ensureWaitingRoomCandidate(user.id).catch(() => null);
-        router.replace("/waiting-room");
-        return;
-      }
 
       const profile = await getMyProfile(user.id).catch(() => null);
       if (!isProfileComplete(profile)) {

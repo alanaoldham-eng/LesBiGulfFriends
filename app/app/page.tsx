@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ClientShell } from "../../components/ClientShell";
 import { getCurrentUser } from "../../lib/auth";
-import { listFriends, listMyGroups, getMyProfile, listPositiveKarmaStandings, hasBreakfastCheckInToday, getBreakfastProgress, isProfileComplete } from "../../lib/db";
+import { listFriends, listMyGroups, getMyProfile, hasBreakfastCheckInToday, getBreakfastProgress, isProfileComplete } from "../../lib/db";
 import { getFeaturedContentSources, listConfessions, getViewerRoleFlags, listWaitingRoomCandidates } from "../../lib/roadmap";
-import { canAccessCommunity, ensureWaitingRoomCandidate } from "../../lib/community";
 
 function formatKarma(value: any) {
   const num = Number(value || 0);
@@ -15,12 +13,10 @@ function formatKarma(value: any) {
 }
 
 export default function AppHomePage() {
-  const router = useRouter();
   const [name, setName] = useState("member");
   const [friendCount, setFriendCount] = useState(0);
   const [groupCount, setGroupCount] = useState(0);
   const [karmaPoints, setKarmaPoints] = useState(0);
-  const [standings, setStandings] = useState<any[]>([]);
   const [checkedInToday, setCheckedInToday] = useState(false);
   const [breakfastProgress, setBreakfastProgress] = useState<any | null>(null);
   const [featuredSources, setFeaturedSources] = useState<any[]>([]);
@@ -28,37 +24,30 @@ export default function AppHomePage() {
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [canReview, setCanReview] = useState(false);
   const [waitingCount, setWaitingCount] = useState(0);
+  const [mainGroupId, setMainGroupId] = useState<string | null>(null);
 
   useEffect(() => {
     const run = async () => {
       const user = await getCurrentUser().catch(() => null);
       if (!user) return;
 
-      const access = await canAccessCommunity({ userId: user.id, email: user.email }).catch(() => null);
-      if (!access?.allowed) {
-        await ensureWaitingRoomCandidate(user.id).catch(() => null);
-        router.replace("/waiting-room");
-        return;
-      }
-
-      const [friends, groups, profile, leaderboard, checked, progress, sources, confessions, roleFlags, waiting] = await Promise.all([
+      const [friends, groups, profile, checked, progress, sources, confessions, roleFlags, waiting] = await Promise.all([
         listFriends(user.id).catch(() => []),
         listMyGroups(user.id).catch(() => []),
         getMyProfile(user.id).catch(() => null),
-        listPositiveKarmaStandings(200).catch(() => []),
         hasBreakfastCheckInToday(user.id).catch(() => false),
         getBreakfastProgress(user.id).catch(() => null),
         getFeaturedContentSources().catch(() => []),
         listConfessions(3).catch(() => []),
-        getViewerRoleFlags(user.id).catch(() => ({ canReview: false, profile: null })),
+        getViewerRoleFlags(user.id).catch(() => ({ canReview: false })),
         listWaitingRoomCandidates().catch(() => []),
       ]);
 
+      const mainGroup = (groups || []).find((g: any) => String(g.name || "").toLowerCase() === "main");
       setFriendCount(friends.length);
       setGroupCount(groups.length);
       setName(profile?.display_name || user.email?.split("@")[0] || "member");
       setKarmaPoints(Number(profile?.karma_points || 0));
-      setStandings(leaderboard);
       setCheckedInToday(checked);
       setBreakfastProgress(progress);
       setFeaturedSources(sources);
@@ -66,9 +55,10 @@ export default function AppHomePage() {
       setNeedsOnboarding(!isProfileComplete(profile));
       setCanReview(!!roleFlags?.canReview);
       setWaitingCount((waiting || []).filter((x: any) => x.status === "waiting" || x.status === "questioned").length);
+      setMainGroupId(mainGroup?.id || null);
     };
     run();
-  }, [router]);
+  }, []);
 
   return (
     <ClientShell>
@@ -77,6 +67,10 @@ export default function AppHomePage() {
         <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
           Your web beta now includes games, curated content, anonymous confessions, blind chat, a waiting room, and the new consensual roleplay game.
         </p>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
+          {mainGroupId ? <Link className="button" href={`/groups-app/${mainGroupId}`}>Open Main Group</Link> : <Link className="button" href="/groups-app">Open Groups</Link>}
+          <Link className="button secondary" href="/groups-app">Browse Groups</Link>
+        </div>
       </section>
 
       <div className="grid">
@@ -84,7 +78,7 @@ export default function AppHomePage() {
           <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff7fb" }}>
             <h3 style={{ marginTop: 0 }}>Finish your profile</h3>
             <p style={{ opacity: 0.85, lineHeight: 1.6 }}>
-              Members are struggling when every unfinished account appears as New Member. Complete your name and add at least one photo, then we will send you straight to the Main group so you can post your introduction.
+              Complete your name and add at least one photo, then go to the Main group so you can post your introduction.
             </p>
             <Link className="button" href="/onboarding/profile">Complete profile</Link>
           </section>
@@ -112,13 +106,8 @@ export default function AppHomePage() {
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <h3 style={{ marginTop: 0 }}>Games reminder</h3>
           <p style={{ opacity: 0.85, lineHeight: 1.6 }}>
-            {checkedInToday ? `You already checked in for Breakfast of Champions today. Current streak: ${breakfastProgress?.current_streak || 0} 🔥` : "Breakfast of Champions is waiting for you. Meditate, post your intention, and protect your streak."}
+            {checkedInToday ? `You already checked in for Breakfast of Champions today. Current streak: ${breakfastProgress?.current_streak || 0} 🔥` : "Breakfast of Champions is waiting for you."}
           </p>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <Link className="button" href="/games/breakfast_of_champions">{checkedInToday ? "View Breakfast of Champions" : "Check in now"}</Link>
-            <Link className="button secondary" href="/games">Open Games</Link>
-            <Link className="button secondary" href="/games/roleplay">Roleplay Game</Link>
-          </div>
         </section>
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
@@ -129,7 +118,7 @@ export default function AppHomePage() {
               <p style={{ margin: "8px 0", opacity: 0.8 }}>{source.editorial_note || source.description || "Fresh curated content for members."}</p>
               <Link className="button secondary" href={`/content/${source.slug}`}>Open</Link>
             </div>
-          )) : <p style={{ margin: 0, opacity: 0.8 }}>Curated content is ready. Add your first featured source in Supabase to populate this section.</p>}
+          )) : <p style={{ margin: 0, opacity: 0.8 }}>Curated content is ready.</p>}
         </section>
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
@@ -140,7 +129,7 @@ export default function AppHomePage() {
               <div style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{post.body}</div>
               <div style={{ marginTop: 6, fontSize: 13, opacity: 0.75 }}>{post.reply_count} replies • {post.reaction_count} reactions</div>
             </div>
-          )) : <p style={{ margin: 0, opacity: 0.8 }}>No anonymous posts yet. Be the first to start the space.</p>}
+          )) : <p style={{ margin: 0, opacity: 0.8 }}>No anonymous posts yet.</p>}
           <div style={{ marginTop: 12 }}><Link className="button secondary" href="/confessions">Open Confessions</Link></div>
         </section>
       </div>
