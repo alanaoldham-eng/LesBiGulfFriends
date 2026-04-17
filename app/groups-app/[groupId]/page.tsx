@@ -35,7 +35,10 @@ async function sendFriendRequestEmailNotification(recipientUserId: string, reque
 
 const EMOJIS = ["❤️", "👍", "😂", "🔥", "👏"];
 const PAGE_SIZE = 12;
-function formatKarma(value: any) { const num = Number(value || 0); return Number.isInteger(num) ? String(num) : num.toFixed(1).replace(/\.0$/, ""); }
+function formatKarma(value: any) {
+  const num = Number(value || 0);
+  return Number.isInteger(num) ? String(num) : num.toFixed(1).replace(/\.0$/, "");
+}
 
 function MessageCard({ m, me, friendIds, onAddFriend, onReplyStart, onReplyCancel, onReplySend, onReact, openReplyId, draftReply, setDraftReply, attachment, setAttachment, linkUrl, setLinkUrl, collapsed, toggleCollapse }: any) {
   const mainPhoto = m.profile?.photo_urls?.[0] || m.profile?.photo_url || null;
@@ -62,9 +65,9 @@ function MessageCard({ m, me, friendIds, onAddFriend, onReplyStart, onReplyCance
           </div>
           {isOpen ? (
             <div style={{ marginTop: 10, display: "grid", gap: 10, border: "1px solid #f1dfe8", borderRadius: 14, padding: 10, background: "#fffafc" }}>
-              <textarea value={draftReply} onChange={(e) => setDraftReply(e.target.value)} placeholder="Write your reply" style={{ minHeight: 90, padding: '12px 14px', borderRadius: 12, border: '1px solid #d7a8bf', fontSize: 15 }} />
-              <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder='Optional link' style={{ padding: '10px 12px', borderRadius: 12, border: '1px solid #d7a8bf', fontSize: 14 }} />
-              <input type='file' accept='image/*,.pdf,.doc,.docx,.txt,.zip' onChange={(e) => setAttachment(e.target.files?.[0] || null)} />
+              <textarea value={draftReply} onChange={(e) => setDraftReply(e.target.value)} placeholder="Write your reply" style={{ minHeight: 90, padding: "12px 14px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 15 }} />
+              <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="Optional link" style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 14 }} />
+              <input type="file" accept="image/*,.pdf,.doc,.docx,.txt,.zip" onChange={(e) => setAttachment(e.target.files?.[0] || null)} />
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button className="button" onClick={() => onReplySend(String(m.id))}>Send reply</button>
                 <button className="button secondary" onClick={onReplyCancel}>Cancel</button>
@@ -80,7 +83,7 @@ function MessageCard({ m, me, friendIds, onAddFriend, onReplyStart, onReplyCance
 export default function GroupThreadPage() {
   const params = useParams<{ groupId: string }>();
   const router = useRouter();
-  const groupId = params.groupId;
+  const groupId = params?.groupId || "";
   const [me, setMe] = useState("");
   const [group, setGroup] = useState<any | null>(null);
   const [membership, setMembership] = useState<any | null>(null);
@@ -105,6 +108,7 @@ export default function GroupThreadPage() {
   const isOwner = membership?.role === "owner";
 
   const refresh = async (uid: string) => {
+    if (!groupId) return;
     const [groupRow, membershipRow, memberRows, messageRows, fids, myProfile, groups] = await Promise.all([
       getGroupById(groupId).catch(() => null),
       getMyGroupMembership(groupId, uid).catch(() => null),
@@ -125,8 +129,9 @@ export default function GroupThreadPage() {
   };
 
   useEffect(() => {
+    if (!groupId) return;
     const run = async () => {
-      const user = await getCurrentUser();
+      const user = await getCurrentUser().catch(() => null);
       if (!user) return;
       setMe(user.id);
       await refresh(user.id);
@@ -191,6 +196,7 @@ export default function GroupThreadPage() {
   };
 
   const send = async () => {
+    if (!groupId || !me) return;
     if (!body.trim() && !linkUrl.trim() && !attachment) return;
     try {
       let mediaUrl: string | null = null;
@@ -206,6 +212,7 @@ export default function GroupThreadPage() {
   };
 
   const sendReply = async (parentMessageId: string) => {
+    if (!groupId || !me) return;
     if (!replyBody.trim() && !replyLinkUrl.trim() && !replyAttachment) return;
     try {
       let mediaUrl: string | null = null;
@@ -227,10 +234,10 @@ export default function GroupThreadPage() {
       if (!result?.duplicate) { setFriendIds(new Set<string>([...Array.from(friendIds), userId])); await sendFriendRequestEmailNotification(userId, myName); }
     } catch (e: any) { setStatus(e.message || "Unable to send friend request."); }
   };
-  const react = async (messageId: string, emoji: string) => { try { await reactToGroupMessage(groupId, messageId, me, emoji); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to react to message."); } };
-  const promoteToMod = async (userId: string) => { try { await updateGroupMemberRole(groupId, userId, "mod"); setStatus("Member promoted to moderator."); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to update role."); } };
-  const demoteToMember = async (userId: string) => { try { await updateGroupMemberRole(groupId, userId, "member"); setStatus("Moderator changed to member."); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to update role."); } };
-  const removeMemberFromGroup = async (userId: string) => { try { await removeGroupMember(groupId, userId); setStatus("Member removed."); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to remove member."); } };
+  const react = async (messageId: string, emoji: string) => { if (!groupId || !me) return; try { await reactToGroupMessage(groupId, messageId, me, emoji); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to react to message."); } };
+  const promoteToMod = async (userId: string) => { if (!groupId) return; try { await updateGroupMemberRole(groupId, userId, "mod"); setStatus("Member promoted to moderator."); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to update role."); } };
+  const demoteToMember = async (userId: string) => { if (!groupId) return; try { await updateGroupMemberRole(groupId, userId, "member"); setStatus("Moderator changed to member."); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to update role."); } };
+  const removeMemberFromGroup = async (userId: string) => { if (!groupId) return; try { await removeGroupMember(groupId, userId); setStatus("Member removed."); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to remove member."); } };
 
   return (
     <ClientShell>
@@ -240,28 +247,28 @@ export default function GroupThreadPage() {
       </section>
       <div className="grid">
         {needsOnboarding ? (
-          <section style={{ border: '1px solid #e9d7e2', borderRadius: 20, padding: 16, background: '#fff7fb' }}>
+          <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff7fb" }}>
             <h3 style={{ marginTop: 0 }}>Finish your profile first</h3>
             <p style={{ opacity: 0.85 }}>Accounts named New Member are confusing people. Add a real display name and at least one photo, then come back to the Main group to introduce yourself.</p>
-            <button className='button' onClick={() => router.push('/onboarding/profile')}>Complete profile</button>
+            <button className="button" onClick={() => router.push("/onboarding/profile")}>Complete profile</button>
           </section>
         ) : null}
 
-        <section style={{ border: '1px solid #e9d7e2', borderRadius: 20, padding: 16, background: '#fff' }}>
+        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <h3 style={{ marginTop: 0 }}>Groups</h3>
-          <div style={{ display: 'grid', gap: 8 }}>
-            {allGroups.map((g: any) => <Link key={g.id} className='button secondary' href={`/groups-app/${g.id}`}>{String(g.name || '').toLowerCase() === 'main' ? '⭐ Main' : g.name}</Link>)}
+          <div style={{ display: "grid", gap: 8 }}>
+            {allGroups.map((g: any) => <Link key={g.id} className="button secondary" href={`/groups-app/${g.id}`}>{String(g.name || "").toLowerCase() === "main" ? "⭐ Main" : g.name}</Link>)}
           </div>
-          {String(group?.name || '').toLowerCase() === 'main' ? <p style={{ marginTop: 12, opacity: 0.8 }}>New here? Post your introduction in the composer below.</p> : null}
+          {String(group?.name || "").toLowerCase() === "main" ? <p style={{ marginTop: 12, opacity: 0.8 }}>New here? Post your introduction in the composer below.</p> : null}
         </section>
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <h3 style={{ marginTop: 0 }}>New post</h3>
           <div style={{ display: "grid", gap: 12 }}>
-            <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder={String(group?.name || '').toLowerCase() === 'main' ? 'Introduce yourself to the Main group' : 'Type a group message'} style={{ minHeight: 100, padding: '14px 16px', borderRadius: 16, border: '1px solid #d7a8bf', fontSize: 16 }} />
-            <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder='Optional link' style={{ padding: '14px 16px', borderRadius: 16, border: '1px solid #d7a8bf', fontSize: 16 }} />
-            <input type='file' accept='image/*,.pdf,.doc,.docx,.txt,.zip' onChange={(e) => setAttachment(e.target.files?.[0] || null)} />
-            <button className='button' onClick={send}>Send to group</button>
+            <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder={String(group?.name || "").toLowerCase() === "main" ? "Introduce yourself to the Main group" : "Type a group message"} style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+            <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="Optional link" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+            <input type="file" accept="image/*,.pdf,.doc,.docx,.txt,.zip" onChange={(e) => setAttachment(e.target.files?.[0] || null)} />
+            <button className="button" onClick={send}>Send to group</button>
           </div>
         </section>
 
@@ -293,7 +300,7 @@ export default function GroupThreadPage() {
                     <div style={{ opacity: 0.75 }}>{m.role} • {formatKarma(m.profile?.karma_points)} karma</div>
                   </div>
                 </div>
-                {canModerate && m.user_id !== me ? <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{isOwner && m.role === 'member' ? <button className='button secondary' onClick={() => promoteToMod(m.user_id)}>Make mod</button> : null}{isOwner && m.role === 'mod' ? <button className='button secondary' onClick={() => demoteToMember(m.user_id)}>Make member</button> : null}{(isOwner || (membership?.role === 'mod' && m.role === 'member')) ? <button className='button secondary' onClick={() => removeMemberFromGroup(m.user_id)}>Remove</button> : null}</div> : null}
+                {canModerate && m.user_id !== me ? <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{isOwner && m.role === "member" ? <button className="button secondary" onClick={() => promoteToMod(m.user_id)}>Make mod</button> : null}{isOwner && m.role === "mod" ? <button className="button secondary" onClick={() => demoteToMember(m.user_id)}>Make member</button> : null}{(isOwner || (membership?.role === "mod" && m.role === "member")) ? <button className="button secondary" onClick={() => removeMemberFromGroup(m.user_id)}>Remove</button> : null}</div> : null}
               </div>
             </div>
           ))}

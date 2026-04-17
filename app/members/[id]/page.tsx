@@ -19,7 +19,7 @@ async function sendFriendRequestEmailNotification(recipientUserId: string, reque
 
 export default function MemberProfilePage() {
   const params = useParams<{ id: string }>();
-  const memberId = params.id;
+  const memberId = params?.id || "";
   const [me, setMe] = useState("");
   const [profile, setProfile] = useState<any | null>(null);
   const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
@@ -28,23 +28,27 @@ export default function MemberProfilePage() {
   const [myName, setMyName] = useState("A member");
 
   useEffect(() => {
+    if (!memberId) return;
     const run = async () => {
-      const user = await getCurrentUser();
+      const user = await getCurrentUser().catch(() => null);
       if (!user) return;
       setMe(user.id);
-      const [p, ids, badgeRows]: [any, Set<string>, any[]] = await Promise.all([
+      const [p, ids, badgeRows, myProfile]: [any, Set<string>, any[], any] = await Promise.all([
         getProfileById(memberId).catch(() => null),
         getFriendIds(user.id).catch(() => new Set<string>()),
         listBadgesForUser(memberId).catch(() => []),
+        getMyProfile(user.id).catch(() => null),
       ]);
       setProfile(p);
       setFriendIds(ids);
       setBadges(badgeRows);
+      setMyName(myProfile?.display_name || "A member");
     };
     run();
   }, [memberId]);
 
   const addFriend = async () => {
+    if (!me || !memberId) return;
     try {
       const result: any = await sendFriendRequest(me, memberId);
       setStatus(result?.duplicate ? "Friend request already pending." : "Friend request sent.");
