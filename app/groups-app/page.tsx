@@ -4,8 +4,8 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ClientShell } from "../../components/ClientShell";
 import { getCurrentUser } from "../../lib/auth";
-import { getPublicAndMemberGroups, getMyProfile, isProfileComplete } from "../../lib/db";
-import { canAccessCommunity, ensureCandidateAndRoute } from "../../lib/community";
+import { getMyProfile, getPublicAndMemberGroups, isProfileComplete } from "../../lib/db";
+import { canAccessCommunity, ensureWaitingRoomCandidate } from "../../lib/community";
 
 export default function GroupsAppPage() {
   const router = useRouter();
@@ -15,9 +15,9 @@ export default function GroupsAppPage() {
       const user = await getCurrentUser().catch(() => null);
       if (!user) return;
 
-      const access = await canAccessCommunity(user.id).catch(() => null);
+      const access = await canAccessCommunity({ userId: user.id, email: user.email }).catch(() => null);
       if (!access?.allowed) {
-        await ensureCandidateAndRoute(user.id).catch(() => null);
+        await ensureWaitingRoomCandidate(user.id).catch(() => null);
         router.replace("/waiting-room");
         return;
       }
@@ -27,6 +27,7 @@ export default function GroupsAppPage() {
         router.replace("/onboarding/profile");
         return;
       }
+
       const groups = await getPublicAndMemberGroups(user.id).catch(() => []);
       const mainGroup = (groups || []).find((g: any) => String(g.name || "").toLowerCase() === "main");
       if (mainGroup?.id) router.replace(`/groups-app/${mainGroup.id}`);

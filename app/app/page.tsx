@@ -1,12 +1,13 @@
 "use client";
-export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ClientShell } from "../../components/ClientShell";
 import { getCurrentUser } from "../../lib/auth";
 import { listFriends, listMyGroups, getMyProfile, listPositiveKarmaStandings, hasBreakfastCheckInToday, getBreakfastProgress, isProfileComplete } from "../../lib/db";
 import { getFeaturedContentSources, listConfessions, getViewerRoleFlags, listWaitingRoomCandidates } from "../../lib/roadmap";
+import { canAccessCommunity, ensureWaitingRoomCandidate } from "../../lib/community";
 
 function formatKarma(value: any) {
   const num = Number(value || 0);
@@ -14,6 +15,7 @@ function formatKarma(value: any) {
 }
 
 export default function AppHomePage() {
+  const router = useRouter();
   const [name, setName] = useState("member");
   const [friendCount, setFriendCount] = useState(0);
   const [groupCount, setGroupCount] = useState(0);
@@ -29,8 +31,16 @@ export default function AppHomePage() {
 
   useEffect(() => {
     const run = async () => {
-      const user = await getCurrentUser();
+      const user = await getCurrentUser().catch(() => null);
       if (!user) return;
+
+      const access = await canAccessCommunity({ userId: user.id, email: user.email }).catch(() => null);
+      if (!access?.allowed) {
+        await ensureWaitingRoomCandidate(user.id).catch(() => null);
+        router.replace("/waiting-room");
+        return;
+      }
+
       const [friends, groups, profile, leaderboard, checked, progress, sources, confessions, roleFlags, waiting] = await Promise.all([
         listFriends(user.id).catch(() => []),
         listMyGroups(user.id).catch(() => []),
@@ -43,6 +53,7 @@ export default function AppHomePage() {
         getViewerRoleFlags(user.id).catch(() => ({ canReview: false, profile: null })),
         listWaitingRoomCandidates().catch(() => []),
       ]);
+
       setFriendCount(friends.length);
       setGroupCount(groups.length);
       setName(profile?.display_name || user.email?.split("@")[0] || "member");
@@ -57,7 +68,7 @@ export default function AppHomePage() {
       setWaitingCount((waiting || []).filter((x: any) => x.status === "waiting" || x.status === "questioned").length);
     };
     run();
-  }, []);
+  }, [router]);
 
   return (
     <ClientShell>
@@ -83,7 +94,7 @@ export default function AppHomePage() {
           <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
             <h3 style={{ marginTop: 0 }}>Reception duties</h3>
             <p style={{ opacity: 0.85, lineHeight: 1.6 }}>
-              There {waitingCount === 1 ? 'is' : 'are'} currently <strong>{waitingCount}</strong> waiting-room candidate{waitingCount === 1 ? '' : 's'} ready for questions and review.
+              There {waitingCount === 1 ? "is" : "are"} currently <strong>{waitingCount}</strong> waiting-room candidate{waitingCount === 1 ? "" : "s"} ready for questions and review.
             </p>
             <Link className="button secondary" href="/waiting-room">Open waiting room</Link>
           </section>
@@ -96,20 +107,6 @@ export default function AppHomePage() {
             <li>{groupCount} groups</li>
             <li>{formatKarma(karmaPoints)} karma points</li>
           </ul>
-          <div style={{ marginTop: 16 }}>
-            <h4 style={{ margin: "0 0 10px" }}>Karma standings</h4>
-            <div style={{ display: "grid", gap: 10 }}>
-              {standings.length ? standings.map((row) => (
-                <div key={row.id} style={{ display: "flex", gap: 12, alignItems: "center", padding: 10, border: "1px solid #f1dfe8", borderRadius: 16 }}>
-                  {(row.photo_urls?.[0] || row.photo_url) ? <img src={row.photo_urls?.[0] || row.photo_url} alt={row.display_name || "Member"} style={{ width: 42, height: 42, borderRadius: 999, objectFit: "cover", border: "1px solid #ead5df" }} /> : null}
-                  <div>
-                    <Link href={`/members/${row.id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>{row.display_name || "Member"}</Link>
-                    <div style={{ opacity: 0.8 }}>{formatKarma(row.karma_points)} karma</div>
-                  </div>
-                </div>
-              )) : <p style={{ margin: 0, opacity: 0.8 }}>Standings will appear when members start earning karma.</p>}
-            </div>
-          </div>
         </section>
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>

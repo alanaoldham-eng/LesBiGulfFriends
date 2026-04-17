@@ -21,7 +21,7 @@ import {
   isProfileComplete,
 } from "../../../lib/db";
 import { listGroupMessagesDetailedUnlimited } from "../../../lib/groupMessagesDetailed";
-import { canAccessCommunity, createCommunityGroup, ensureCandidateAndRoute } from "../../../lib/community";
+import { canAccessCommunity, createCommunityGroup, ensureWaitingRoomCandidate } from "../../../lib/community";
 
 async function sendFriendRequestEmailNotification(recipientUserId: string, requesterName: string) {
   try {
@@ -86,6 +86,7 @@ export default function GroupThreadPage() {
   const params = useParams<{ groupId: string }>();
   const router = useRouter();
   const groupId = params?.groupId || "";
+
   const [me, setMe] = useState("");
   const [group, setGroup] = useState<any | null>(null);
   const [membership, setMembership] = useState<any | null>(null);
@@ -114,11 +115,11 @@ export default function GroupThreadPage() {
   const canModerate = membership?.role === "owner" || membership?.role === "mod";
   const isOwner = membership?.role === "owner";
 
-  const refresh = async (uid: string) => {
+  const refresh = async (uid: string, email?: string | null) => {
     if (!groupId) return;
-    const access = await canAccessCommunity(uid).catch(() => null);
+    const access = await canAccessCommunity({ userId: uid, email }).catch(() => null);
     if (!access?.allowed) {
-      await ensureCandidateAndRoute(uid).catch(() => null);
+      await ensureWaitingRoomCandidate(uid).catch(() => null);
       router.replace("/waiting-room");
       return;
     }
@@ -132,6 +133,7 @@ export default function GroupThreadPage() {
       getMyProfile(uid).catch(() => null),
       getPublicAndMemberGroups(uid).catch(() => []),
     ]);
+
     setGroup(groupRow);
     setMembership(membershipRow);
     setMembers(memberRows);
@@ -149,7 +151,7 @@ export default function GroupThreadPage() {
       const user = await getCurrentUser().catch(() => null);
       if (!user) return;
       setMe(user.id);
-      await refresh(user.id);
+      await refresh(user.id, user.email);
     };
     run();
   }, [groupId]);
@@ -215,13 +217,9 @@ export default function GroupThreadPage() {
         mediaType = attachment.type || "application/octet-stream";
       }
       await sendGroupReply(groupId, me, body.trim(), null, mediaUrl, mediaType, linkUrl.trim() || null);
-      setBody("");
-      setLinkUrl("");
-      setAttachment(null);
+      setBody(""); setLinkUrl(""); setAttachment(null);
       await refresh(me);
-    } catch (e: any) {
-      setStatus(e.message || "Unable to send group message.");
-    }
+    } catch (e: any) { setStatus(e.message || "Unable to send group message."); }
   };
 
   const sendReply = async (parentMessageId: string) => {
@@ -235,14 +233,9 @@ export default function GroupThreadPage() {
         mediaType = replyAttachment.type || "application/octet-stream";
       }
       await sendGroupReply(groupId, me, replyBody.trim(), parentMessageId, mediaUrl, mediaType, replyLinkUrl.trim() || null);
-      setReplyTo(null);
-      setReplyBody("");
-      setReplyLinkUrl("");
-      setReplyAttachment(null);
+      setReplyTo(null); setReplyBody(""); setReplyLinkUrl(""); setReplyAttachment(null);
       await refresh(me);
-    } catch (e: any) {
-      setStatus(e.message || "Unable to send group reply.");
-    }
+    } catch (e: any) { setStatus(e.message || "Unable to send group reply."); }
   };
 
   const addFriend = async (userId: string) => {
@@ -253,9 +246,7 @@ export default function GroupThreadPage() {
         setFriendIds(new Set<string>([...Array.from(friendIds), userId]));
         await sendFriendRequestEmailNotification(userId, myName);
       }
-    } catch (e: any) {
-      setStatus(e.message || "Unable to send friend request.");
-    }
+    } catch (e: any) { setStatus(e.message || "Unable to send friend request."); }
   };
 
   const react = async (messageId: string, emoji: string) => {
@@ -263,9 +254,7 @@ export default function GroupThreadPage() {
     try {
       await reactToGroupMessage(groupId, messageId, me, emoji);
       await refresh(me);
-    } catch (e: any) {
-      setStatus(e.message || "Unable to react to message.");
-    }
+    } catch (e: any) { setStatus(e.message || "Unable to react to message."); }
   };
 
   const promoteToMod = async (userId: string) => {
@@ -274,9 +263,7 @@ export default function GroupThreadPage() {
       await updateGroupMemberRole(groupId, userId, "mod");
       setStatus("Member promoted to moderator.");
       await refresh(me);
-    } catch (e: any) {
-      setStatus(e.message || "Unable to update role.");
-    }
+    } catch (e: any) { setStatus(e.message || "Unable to update role."); }
   };
 
   const demoteToMember = async (userId: string) => {
@@ -285,9 +272,7 @@ export default function GroupThreadPage() {
       await updateGroupMemberRole(groupId, userId, "member");
       setStatus("Moderator changed to member.");
       await refresh(me);
-    } catch (e: any) {
-      setStatus(e.message || "Unable to update role.");
-    }
+    } catch (e: any) { setStatus(e.message || "Unable to update role."); }
   };
 
   const removeMemberFromGroup = async (userId: string) => {
@@ -296,9 +281,7 @@ export default function GroupThreadPage() {
       await removeGroupMember(groupId, userId);
       setStatus("Member removed.");
       await refresh(me);
-    } catch (e: any) {
-      setStatus(e.message || "Unable to remove member.");
-    }
+    } catch (e: any) { setStatus(e.message || "Unable to remove member."); }
   };
 
   const createGroup = async () => {
@@ -317,9 +300,7 @@ export default function GroupThreadPage() {
       setNewGroupPrivate(false);
       setStatus("Group created.");
       router.push(`/groups-app/${created.id}`);
-    } catch (e: any) {
-      setStatus(e.message || "Unable to create group.");
-    }
+    } catch (e: any) { setStatus(e.message || "Unable to create group."); }
   };
 
   const postPlaceholder = String(group?.name || "").toLowerCase() === "main" ? "Introduce yourself to the Main group" : `Post to ${group?.name || "group"}`;
@@ -330,6 +311,7 @@ export default function GroupThreadPage() {
         <h1 style={{ margin: 0, fontSize: 30 }}>{group?.name || "Group"}</h1>
         <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>{group?.is_private ? "Private group." : "Public group."} Main group is always pinned first and other groups are sorted by latest activity.</p>
       </section>
+
       <div className="grid">
         {needsOnboarding ? (
           <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff7fb" }}>
@@ -350,7 +332,10 @@ export default function GroupThreadPage() {
             <div style={{ marginTop: 12, display: "grid", gap: 10, border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, background: "#fffafc" }}>
               <input value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="Group name" style={{ padding: "12px 14px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 15 }} />
               <textarea value={newGroupDescription} onChange={(e) => setNewGroupDescription(e.target.value)} placeholder="Group description" style={{ minHeight: 90, padding: "12px 14px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 15 }} />
-              <label style={{ display: "flex", gap: 10, alignItems: "center" }}><input type="checkbox" checked={newGroupPrivate} onChange={(e) => setNewGroupPrivate(e.target.checked)} /><span>Private group</span></label>
+              <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <input type="checkbox" checked={newGroupPrivate} onChange={(e) => setNewGroupPrivate(e.target.checked)} />
+                <span>Private group</span>
+              </label>
               <button className="button" onClick={createGroup}>Create this group</button>
             </div>
           ) : null}
@@ -373,9 +358,11 @@ export default function GroupThreadPage() {
             <h3 style={{ margin: 0 }}>Threads</h3>
             <div style={{ opacity: 0.75 }}>{Math.min(visibleCount, messageTree.length)} of {messageTree.length} shown</div>
           </div>
+
           <div style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, minHeight: 220, background: "#fffafc", marginTop: 10 }}>
             {visibleRoots.length ? visibleRoots.map((m) => renderThread(m)) : <p style={{ margin: 0, opacity: 0.7 }}>No group messages yet.</p>}
           </div>
+
           {visibleCount < messageTree.length ? <div style={{ marginTop: 12 }}><button className="button secondary" onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}>Read more</button></div> : null}
         </section>
 
@@ -399,6 +386,7 @@ export default function GroupThreadPage() {
           ))}
           {!members.length ? <p style={{ margin: 0, opacity: 0.75 }}>No members yet.</p> : null}
         </section>
+
         {status ? <p style={{ margin: 0, opacity: 0.8 }}>{status}</p> : null}
       </div>
     </ClientShell>
