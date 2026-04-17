@@ -1,5 +1,4 @@
 "use client";
-export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -10,7 +9,6 @@ import {
   getGroupById,
   getMyGroupMembership,
   listGroupMembers,
-  listGroupMessagesDetailed,
   removeGroupMember,
   sendGroupReply,
   updateGroupMemberRole,
@@ -22,6 +20,7 @@ import {
   getPublicAndMemberGroups,
   isProfileComplete,
 } from "../../../lib/db";
+import { listGroupMessagesDetailedUnlimited } from "../../../lib/groupMessagesDetailed";
 
 async function sendFriendRequestEmailNotification(recipientUserId: string, requesterName: string) {
   try {
@@ -40,7 +39,7 @@ function formatKarma(value: any) {
   return Number.isInteger(num) ? String(num) : num.toFixed(1).replace(/\.0$/, "");
 }
 
-function MessageCard({ m, me, friendIds, onAddFriend, onReplyStart, onReplyCancel, onReplySend, onReact, openReplyId, draftReply, setDraftReply, attachment, setAttachment, linkUrl, setLinkUrl, collapsed, toggleCollapse }: any) {
+function MessageCard({ m, me, friendIds, onAddFriend, onReplyStart, onReplyCancel, onReplySend, onReact, openReplyId, draftReply, setDraftReply, setAttachment, linkUrl, setLinkUrl, collapsed, toggleCollapse }: any) {
   const mainPhoto = m.profile?.photo_urls?.[0] || m.profile?.photo_url || null;
   const isFriend = friendIds.has(m.sender_id);
   const grouped = new Map<string, number>();
@@ -65,7 +64,7 @@ function MessageCard({ m, me, friendIds, onAddFriend, onReplyStart, onReplyCance
           </div>
           {isOpen ? (
             <div style={{ marginTop: 10, display: "grid", gap: 10, border: "1px solid #f1dfe8", borderRadius: 14, padding: 10, background: "#fffafc" }}>
-              <textarea value={draftReply} onChange={(e) => setDraftReply(e.target.value)} placeholder="Write your reply" style={{ minHeight: 90, padding: "12px 14px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 15 }} />
+              <textarea value={draftReply} onChange={(e) => setDraftReply(e.target.value)} placeholder="Reply here" style={{ minHeight: 90, padding: "12px 14px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 15 }} />
               <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="Optional link" style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 14 }} />
               <input type="file" accept="image/*,.pdf,.doc,.docx,.txt,.zip" onChange={(e) => setAttachment(e.target.files?.[0] || null)} />
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -113,7 +112,7 @@ export default function GroupThreadPage() {
       getGroupById(groupId).catch(() => null),
       getMyGroupMembership(groupId, uid).catch(() => null),
       listGroupMembers(groupId).catch(() => []),
-      listGroupMessagesDetailed(groupId).catch(() => []),
+      listGroupMessagesDetailedUnlimited(groupId).catch(() => []),
       getFriendIds(uid).catch(() => new Set<string>()),
       getMyProfile(uid).catch(() => null),
       getPublicAndMemberGroups(uid).catch(() => []),
@@ -172,14 +171,13 @@ export default function GroupThreadPage() {
           me={me}
           friendIds={friendIds}
           onAddFriend={addFriend}
-          onReplyStart={(id: string) => { setReplyTo(id); setStatus("Replying inline."); }}
+          onReplyStart={(id: string) => { setReplyTo(id); setReplyBody(""); setReplyLinkUrl(""); setReplyAttachment(null); setStatus("Replying inline."); }}
           onReplyCancel={() => { setReplyTo(null); setReplyBody(""); setReplyLinkUrl(""); setReplyAttachment(null); }}
           onReplySend={sendReply}
           onReact={react}
           openReplyId={replyTo}
           draftReply={replyBody}
           setDraftReply={setReplyBody}
-          attachment={replyAttachment}
           setAttachment={setReplyAttachment}
           linkUrl={replyLinkUrl}
           setLinkUrl={setReplyLinkUrl}
@@ -239,6 +237,8 @@ export default function GroupThreadPage() {
   const demoteToMember = async (userId: string) => { if (!groupId) return; try { await updateGroupMemberRole(groupId, userId, "member"); setStatus("Moderator changed to member."); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to update role."); } };
   const removeMemberFromGroup = async (userId: string) => { if (!groupId) return; try { await removeGroupMember(groupId, userId); setStatus("Member removed."); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to remove member."); } };
 
+  const postPlaceholder = String(group?.name || "").toLowerCase() === "main" ? "Introduce yourself to the Main group" : `Post to ${group?.name || "group"}`;
+
   return (
     <ClientShell>
       <section className="hero">
@@ -265,7 +265,7 @@ export default function GroupThreadPage() {
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <h3 style={{ marginTop: 0 }}>New post</h3>
           <div style={{ display: "grid", gap: 12 }}>
-            <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder={String(group?.name || "").toLowerCase() === "main" ? "Introduce yourself to the Main group" : "Type a group message"} style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+            <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder={postPlaceholder} style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
             <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="Optional link" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
             <input type="file" accept="image/*,.pdf,.doc,.docx,.txt,.zip" onChange={(e) => setAttachment(e.target.files?.[0] || null)} />
             <button className="button" onClick={send}>Send to group</button>

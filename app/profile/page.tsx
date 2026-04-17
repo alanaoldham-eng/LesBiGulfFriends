@@ -1,12 +1,24 @@
 "use client";
-export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import { ClientShell } from "../../components/ClientShell";
 import { EmptyState } from "../../components/EmptyState";
 import { getCurrentUser } from "../../lib/auth";
 import Link from "next/link";
-import { deletePublicImage, getMainGroupId, getMyProfile, hasPostedIntroduction, upsertMyProfile, uploadPublicImage, listBadgesForUser, getNotificationSettings, upsertNotificationSettings, type RelationshipStatus } from "../../lib/db";
+import {
+  deletePublicImage,
+  getMainGroupId,
+  getMyProfile,
+  hasPostedIntroduction,
+  upsertMyProfile,
+  uploadPublicImage,
+  listBadgesForUser,
+  type RelationshipStatus,
+} from "../../lib/db";
+import {
+  getEmailNotificationSettings,
+  upsertEmailNotificationSettings,
+} from "../../lib/notificationSettings";
 
 function formatKarma(value: any) {
   const num = Number(value || 0);
@@ -34,7 +46,11 @@ export default function ProfilePage() {
   const [badges, setBadges] = useState<any[]>([]);
   const [mainGroupId, setMainGroupId] = useState<string | null>(null);
   const [hasIntro, setHasIntro] = useState(false);
-  const [notificationSettings, setNotificationSettings] = useState({ email_friend_requests: false, email_private_messages: false, email_breakfast_reminders: false, in_app_friend_requests: true, in_app_private_messages: true });
+  const [notificationSettings, setNotificationSettings] = useState({
+    email_friend_requests: false,
+    email_private_messages: false,
+    email_breakfast_reminders: false,
+  });
   const canAddMorePhotos = photoUrls.length < 3;
 
   useEffect(() => {
@@ -55,12 +71,18 @@ export default function ProfilePage() {
           setRelationshipStatus((profile.relationship_status as RelationshipStatus | null) || "");
           setPhotoUrls(profile.photo_urls || (profile.photo_url ? [profile.photo_url] : []));
           setKarmaPoints(Number(profile.karma_points || 0));
+
           const [mainId, introPosted, badgeRows, notif] = await Promise.all([
             getMainGroupId().catch(() => null),
             hasPostedIntroduction(user.id).catch(() => false),
             listBadgesForUser(user.id).catch(() => []),
-            getNotificationSettings(user.id).catch(() => ({ email_friend_requests: false, email_private_messages: false, email_breakfast_reminders: false, in_app_friend_requests: true, in_app_private_messages: true })),
+            getEmailNotificationSettings(user.id).catch(() => ({
+              email_friend_requests: false,
+              email_private_messages: false,
+              email_breakfast_reminders: false,
+            })),
           ]);
+
           setMainGroupId(mainId);
           setHasIntro(introPosted);
           setBadges(badgeRows);
@@ -68,8 +90,6 @@ export default function ProfilePage() {
             email_friend_requests: Boolean(notif?.email_friend_requests),
             email_private_messages: Boolean(notif?.email_private_messages),
             email_breakfast_reminders: Boolean(notif?.email_breakfast_reminders),
-            in_app_friend_requests: Boolean(notif?.in_app_friend_requests ?? true),
-            in_app_private_messages: Boolean(notif?.in_app_private_messages ?? true),
           });
           setStatus("");
         } catch {
@@ -95,7 +115,14 @@ export default function ProfilePage() {
         photo_urls: photoUrls,
         photo_url: photoUrls[0] || null,
       });
-      await upsertNotificationSettings({ user_id: userId, ...notificationSettings });
+
+      await upsertEmailNotificationSettings({
+        user_id: userId,
+        email_friend_requests: notificationSettings.email_friend_requests,
+        email_private_messages: notificationSettings.email_private_messages,
+        email_breakfast_reminders: notificationSettings.email_breakfast_reminders,
+      });
+
       localStorage.setItem("lbgf_profile_started", "1");
       setStatus("Profile saved.");
     } catch (e: any) {
@@ -141,7 +168,15 @@ export default function ProfilePage() {
         <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
           Set a nickname or display name so the app shows that instead of your email address. Add up to 3 photos, choose their order, and tell people a little about yourself.
         </p>
-{badges.length ? <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>{badges.map((badge) => <span key={badge.id} style={{ padding: "6px 10px", borderRadius: 999, background: "#fff7fb", border: "1px solid #f1dfe8" }}>{badge.emoji} {badge.badge_label}</span>)}</div> : null}
+        {badges.length ? (
+          <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {badges.map((badge) => (
+              <span key={badge.id} style={{ padding: "6px 10px", borderRadius: 999, background: "#fff7fb", border: "1px solid #f1dfe8" }}>
+                {badge.emoji} {badge.badge_label}
+              </span>
+            ))}
+          </div>
+        ) : null}
         <div style={{ marginTop: 12, padding: 12, borderRadius: 16, border: "1px solid #efcad8", background: "#fff" }}>
           <strong>Karma points:</strong> {formatKarma(karmaPoints)}
         </div>
@@ -176,95 +211,45 @@ export default function ProfilePage() {
             ) : null}
 
             <div style={{ display: "grid", gap: 12 }}>
-              <input
-                id="display-name"
-                name="displayName"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Nickname or display name"
-                style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
-              />
-              <textarea
-                id="bio"
-                name="bio"
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                placeholder="Bio"
-                style={{ minHeight: 120, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
-              />
-              <input
-                id="interests"
-                name="interests"
-                value={interests}
-                onChange={(e) => setInterests(e.target.value)}
-                placeholder="Interests (comma separated)"
-                style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
-              />
-              <input
-                id="city"
-                name="city"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="City"
-                style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
-              />
-              <select
-                id="relationship-status"
-                name="relationshipStatus"
-                value={relationshipStatus}
-                onChange={(e) => setRelationshipStatus(e.target.value as RelationshipStatus | "")}
-                style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, background: "#fff" }}
-              >
+              <input id="display-name" name="displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Nickname or display name" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+              <textarea id="bio" name="bio" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Bio" style={{ minHeight: 120, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+              {photoUrls.length > 1 ? (
+                <div style={{ display: "grid", gap: 10 }}>
+                  <div style={{ fontWeight: 700, opacity: 0.85 }}>More photos</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+                    {photoUrls.slice(1, 3).map((url, idx) => (
+                      <img key={url} src={url} alt={`Additional profile ${idx + 2}`} style={{ width: "100%", aspectRatio: "1 / 1", objectFit: "cover", borderRadius: 18, border: "1px solid #ead5df" }} />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              <input id="interests" name="interests" value={interests} onChange={(e) => setInterests(e.target.value)} placeholder="Interests (comma separated)" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+              <input id="city" name="city" value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+              <select id="relationship-status" name="relationshipStatus" value={relationshipStatus} onChange={(e) => setRelationshipStatus(e.target.value as RelationshipStatus | "")} style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, background: "#fff" }}>
                 <option value="">Relationship status</option>
-                {RELATIONSHIP_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
+                {RELATIONSHIP_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
               </select>
 
-
-<div style={{ display: "grid", gap: 10, border: "1px solid #f1dfe8", borderRadius: 18, padding: 12, background: "#fffafc" }}>
-  <strong>Email notifications (opt in)</strong>
-  <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-    <input type="checkbox" checked={notificationSettings.email_friend_requests} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_friend_requests: e.target.checked }))} />
-    <span>Email me when I get a friend request</span>
-  </label>
-  <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-    <input type="checkbox" checked={notificationSettings.email_private_messages} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_private_messages: e.target.checked }))} />
-    <span>Email me when I get a private message</span>
-  </label>
-  <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-    <input type="checkbox" checked={notificationSettings.email_breakfast_reminders} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_breakfast_reminders: e.target.checked }))} />
-    <span>Email me a Breakfast of Champions reminder</span>
-  </label>
-</div>
-
-<div style={{ display: "grid", gap: 10, border: "1px solid #f1dfe8", borderRadius: 18, padding: 12, background: "#fffafc" }}>
-  <strong>In-app notifications (opt in)</strong>
-  <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-    <input type="checkbox" checked={notificationSettings.in_app_friend_requests} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, in_app_friend_requests: e.target.checked }))} />
-    <span>Show in-app notifications for friend requests</span>
-  </label>
-  <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-    <input type="checkbox" checked={notificationSettings.in_app_private_messages} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, in_app_private_messages: e.target.checked }))} />
-    <span>Show in-app notifications for private messages</span>
-  </label>
-</div>
+              <div style={{ display: "grid", gap: 10, border: "1px solid #f1dfe8", borderRadius: 18, padding: 12, background: "#fffafc" }}>
+                <strong>Email notifications (opt in)</strong>
+                <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <input type="checkbox" checked={notificationSettings.email_friend_requests} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_friend_requests: e.target.checked }))} />
+                  <span>Email me when I get a friend request</span>
+                </label>
+                <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <input type="checkbox" checked={notificationSettings.email_private_messages} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_private_messages: e.target.checked }))} />
+                  <span>Email me when I get a private message</span>
+                </label>
+                <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <input type="checkbox" checked={notificationSettings.email_breakfast_reminders} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_breakfast_reminders: e.target.checked }))} />
+                  <span>Email me a Breakfast of Champions reminder</span>
+                </label>
+              </div>
 
               <div style={{ display: "grid", gap: 10 }}>
                 <strong>Profile photos</strong>
                 <p style={{ margin: 0, opacity: 0.75 }}>Upload up to 3 profile photos. The first one appears at the top of your profile.</p>
-                {canAddMorePhotos ? (
-                  <input
-                    id="profile-photo-upload"
-                    name="profilePhotoUpload"
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => uploadPhoto(e.target.files?.[0])}
-                    style={{ padding: "10px 0" }}
-                  />
-                ) : (
-                  <p style={{ margin: 0, opacity: 0.75 }}>You have reached the 3 photo limit. Remove a photo to upload another.</p>
-                )}
+                {canAddMorePhotos ? <input id="profile-photo-upload" name="profilePhotoUpload" type="file" accept="image/*" onChange={(e) => uploadPhoto(e.target.files?.[0])} style={{ padding: "10px 0" }} /> : <p style={{ margin: 0, opacity: 0.75 }}>You have reached the 3 photo limit. Remove a photo to upload another.</p>}
 
                 {photoUrls[0] ? (
                   <div style={{ border: "1px solid #f1dfe8", borderRadius: 18, padding: 12, background: "#fffafc" }}>

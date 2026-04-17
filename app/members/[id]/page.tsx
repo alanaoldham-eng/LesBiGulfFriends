@@ -1,5 +1,4 @@
 "use client";
-export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -59,6 +58,7 @@ export default function MemberProfilePage() {
   };
 
   const mainPhoto = profile?.photo_urls?.[0] || profile?.photo_url || null;
+  const extraPhotos = (profile?.photo_urls || []).slice(1, 3);
   const isSelf = me === memberId;
   const isFriend = friendIds.has(memberId);
 
@@ -76,6 +76,13 @@ export default function MemberProfilePage() {
           {mainPhoto ? <img src={mainPhoto} alt={profile?.display_name || "Profile"} style={{ width: 120, height: 120, objectFit: "cover", borderRadius: 20, border: "1px solid #ead5df", marginBottom: 12 }} /> : null}
           <h3 style={{ marginTop: 0 }}>{profile?.display_name || "Unknown member"}</h3>
           <p style={{ opacity: 0.8 }}>{profile?.bio || "No bio yet."}</p>
+          {extraPhotos.length ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginTop: 12, marginBottom: 12 }}>
+              {extraPhotos.map((url: string, idx: number) => (
+                <img key={url} src={url} alt={`Additional profile ${idx + 2}`} style={{ width: "100%", aspectRatio: "1 / 1", objectFit: "cover", borderRadius: 18, border: "1px solid #ead5df" }} />
+              ))}
+            </div>
+          ) : null}
           {profile?.city ? <p style={{ opacity: 0.75 }}>City: {profile.city}</p> : null}
           {profile?.relationship_status ? <p style={{ opacity: 0.75 }}>Relationship status: {profile.relationship_status}</p> : null}
           {badges.length ? <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>{badges.map((badge) => <span key={badge.id} style={{ padding: "6px 10px", borderRadius: 999, background: "#fff7fb", border: "1px solid #f1dfe8" }}>{badge.emoji} {badge.badge_label}</span>)}</div> : null}
