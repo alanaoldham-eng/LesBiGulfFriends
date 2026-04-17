@@ -21,6 +21,7 @@ import {
   isProfileComplete,
 } from "../../../lib/db";
 import { listGroupMessagesDetailedUnlimited } from "../../../lib/groupMessagesDetailed";
+import { canAccessCommunity, createCommunityGroup, ensureCandidateAndRoute } from "../../../lib/community";
 
 async function sendFriendRequestEmailNotification(recipientUserId: string, requesterName: string) {
   try {
@@ -33,7 +34,8 @@ async function sendFriendRequestEmailNotification(recipientUserId: string, reque
 }
 
 const EMOJIS = ["❤️", "👍", "😂", "🔥", "👏"];
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 10;
+
 function formatKarma(value: any) {
   const num = Number(value || 0);
   return Number.isInteger(num) ? String(num) : num.toFixed(1).replace(/\.0$/, "");
@@ -45,6 +47,7 @@ function MessageCard({ m, me, friendIds, onAddFriend, onReplyStart, onReplyCance
   const grouped = new Map<string, number>();
   (m.reactions || []).forEach((r: any) => grouped.set(r.emoji, (grouped.get(r.emoji) || 0) + 1));
   const isOpen = openReplyId === String(m.id);
+
   return (
     <div style={{ marginBottom: 14, paddingLeft: m.parent_message_id ? 20 : 0, borderLeft: m.parent_message_id ? "3px solid #f1dfe8" : "none" }}>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
@@ -98,16 +101,28 @@ export default function GroupThreadPage() {
   const [replyAttachment, setReplyAttachment] = useState<File | null>(null);
   const [status, setStatus] = useState("");
   const [myName, setMyName] = useState("A member");
+  const [myKarma, setMyKarma] = useState(0);
   const [allGroups, setAllGroups] = useState<any[]>([]);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
-  const [page, setPage] = useState(1);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [collapsedThreads, setCollapsedThreads] = useState<Set<string>>(new Set());
+  const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupDescription, setNewGroupDescription] = useState("");
+  const [newGroupPrivate, setNewGroupPrivate] = useState(false);
 
   const canModerate = membership?.role === "owner" || membership?.role === "mod";
   const isOwner = membership?.role === "owner";
 
   const refresh = async (uid: string) => {
     if (!groupId) return;
+    const access = await canAccessCommunity(uid).catch(() => null);
+    if (!access?.allowed) {
+      await ensureCandidateAndRoute(uid).catch(() => null);
+      router.replace("/waiting-room");
+      return;
+    }
+
     const [groupRow, membershipRow, memberRows, messageRows, fids, myProfile, groups] = await Promise.all([
       getGroupById(groupId).catch(() => null),
       getMyGroupMembership(groupId, uid).catch(() => null),
@@ -123,6 +138,7 @@ export default function GroupThreadPage() {
     setMessages(messageRows);
     setFriendIds(fids);
     setMyName(myProfile?.display_name || "A member");
+    setMyKarma(Number(myProfile?.karma_points || 0));
     setNeedsOnboarding(!isProfileComplete(myProfile));
     setAllGroups(groups);
   };
@@ -155,12 +171,7 @@ export default function GroupThreadPage() {
     return roots;
   }, [messages]);
 
-  const paginatedRoots = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return messageTree.slice(start, start + PAGE_SIZE);
-  }, [messageTree, page]);
-
-  const totalPages = Math.max(1, Math.ceil(messageTree.length / PAGE_SIZE));
+  const visibleRoots = useMemo(() => messageTree.slice(0, visibleCount), [messageTree, visibleCount]);
 
   const renderThread = (node: any): any => {
     const isCollapsed = collapsedThreads.has(String(node.id));
@@ -204,9 +215,13 @@ export default function GroupThreadPage() {
         mediaType = attachment.type || "application/octet-stream";
       }
       await sendGroupReply(groupId, me, body.trim(), null, mediaUrl, mediaType, linkUrl.trim() || null);
-      setBody(""); setLinkUrl(""); setAttachment(null);
+      setBody("");
+      setLinkUrl("");
+      setAttachment(null);
       await refresh(me);
-    } catch (e: any) { setStatus(e.message || "Unable to send group message."); }
+    } catch (e: any) {
+      setStatus(e.message || "Unable to send group message.");
+    }
   };
 
   const sendReply = async (parentMessageId: string) => {
@@ -220,22 +235,92 @@ export default function GroupThreadPage() {
         mediaType = replyAttachment.type || "application/octet-stream";
       }
       await sendGroupReply(groupId, me, replyBody.trim(), parentMessageId, mediaUrl, mediaType, replyLinkUrl.trim() || null);
-      setReplyTo(null); setReplyBody(""); setReplyLinkUrl(""); setReplyAttachment(null);
+      setReplyTo(null);
+      setReplyBody("");
+      setReplyLinkUrl("");
+      setReplyAttachment(null);
       await refresh(me);
-    } catch (e: any) { setStatus(e.message || "Unable to send group reply."); }
+    } catch (e: any) {
+      setStatus(e.message || "Unable to send group reply.");
+    }
   };
 
   const addFriend = async (userId: string) => {
     try {
       const result: any = await sendFriendRequest(me, userId);
       setStatus(result?.duplicate ? "Friend request already pending." : "Friend request sent.");
-      if (!result?.duplicate) { setFriendIds(new Set<string>([...Array.from(friendIds), userId])); await sendFriendRequestEmailNotification(userId, myName); }
-    } catch (e: any) { setStatus(e.message || "Unable to send friend request."); }
+      if (!result?.duplicate) {
+        setFriendIds(new Set<string>([...Array.from(friendIds), userId]));
+        await sendFriendRequestEmailNotification(userId, myName);
+      }
+    } catch (e: any) {
+      setStatus(e.message || "Unable to send friend request.");
+    }
   };
-  const react = async (messageId: string, emoji: string) => { if (!groupId || !me) return; try { await reactToGroupMessage(groupId, messageId, me, emoji); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to react to message."); } };
-  const promoteToMod = async (userId: string) => { if (!groupId) return; try { await updateGroupMemberRole(groupId, userId, "mod"); setStatus("Member promoted to moderator."); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to update role."); } };
-  const demoteToMember = async (userId: string) => { if (!groupId) return; try { await updateGroupMemberRole(groupId, userId, "member"); setStatus("Moderator changed to member."); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to update role."); } };
-  const removeMemberFromGroup = async (userId: string) => { if (!groupId) return; try { await removeGroupMember(groupId, userId); setStatus("Member removed."); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to remove member."); } };
+
+  const react = async (messageId: string, emoji: string) => {
+    if (!groupId || !me) return;
+    try {
+      await reactToGroupMessage(groupId, messageId, me, emoji);
+      await refresh(me);
+    } catch (e: any) {
+      setStatus(e.message || "Unable to react to message.");
+    }
+  };
+
+  const promoteToMod = async (userId: string) => {
+    if (!groupId) return;
+    try {
+      await updateGroupMemberRole(groupId, userId, "mod");
+      setStatus("Member promoted to moderator.");
+      await refresh(me);
+    } catch (e: any) {
+      setStatus(e.message || "Unable to update role.");
+    }
+  };
+
+  const demoteToMember = async (userId: string) => {
+    if (!groupId) return;
+    try {
+      await updateGroupMemberRole(groupId, userId, "member");
+      setStatus("Moderator changed to member.");
+      await refresh(me);
+    } catch (e: any) {
+      setStatus(e.message || "Unable to update role.");
+    }
+  };
+
+  const removeMemberFromGroup = async (userId: string) => {
+    if (!groupId) return;
+    try {
+      await removeGroupMember(groupId, userId);
+      setStatus("Member removed.");
+      await refresh(me);
+    } catch (e: any) {
+      setStatus(e.message || "Unable to remove member.");
+    }
+  };
+
+  const createGroup = async () => {
+    if (!me) return;
+    if (myKarma < 1) return setStatus("You need at least 1 karma to create a group.");
+    try {
+      const created = await createCommunityGroup({
+        name: newGroupName,
+        description: newGroupDescription,
+        isPrivate: newGroupPrivate,
+        createdBy: me,
+      });
+      setCreateGroupOpen(false);
+      setNewGroupName("");
+      setNewGroupDescription("");
+      setNewGroupPrivate(false);
+      setStatus("Group created.");
+      router.push(`/groups-app/${created.id}`);
+    } catch (e: any) {
+      setStatus(e.message || "Unable to create group.");
+    }
+  };
 
   const postPlaceholder = String(group?.name || "").toLowerCase() === "main" ? "Introduce yourself to the Main group" : `Post to ${group?.name || "group"}`;
 
@@ -258,7 +343,18 @@ export default function GroupThreadPage() {
           <h3 style={{ marginTop: 0 }}>Groups</h3>
           <div style={{ display: "grid", gap: 8 }}>
             {allGroups.map((g: any) => <Link key={g.id} className="button secondary" href={`/groups-app/${g.id}`}>{String(g.name || "").toLowerCase() === "main" ? "⭐ Main" : g.name}</Link>)}
+            {myKarma >= 1 ? <button className="button" onClick={() => setCreateGroupOpen((v) => !v)}>{createGroupOpen ? "Close Create Group" : "Create Group"}</button> : null}
           </div>
+
+          {createGroupOpen ? (
+            <div style={{ marginTop: 12, display: "grid", gap: 10, border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, background: "#fffafc" }}>
+              <input value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="Group name" style={{ padding: "12px 14px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 15 }} />
+              <textarea value={newGroupDescription} onChange={(e) => setNewGroupDescription(e.target.value)} placeholder="Group description" style={{ minHeight: 90, padding: "12px 14px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 15 }} />
+              <label style={{ display: "flex", gap: 10, alignItems: "center" }}><input type="checkbox" checked={newGroupPrivate} onChange={(e) => setNewGroupPrivate(e.target.checked)} /><span>Private group</span></label>
+              <button className="button" onClick={createGroup}>Create this group</button>
+            </div>
+          ) : null}
+
           {String(group?.name || "").toLowerCase() === "main" ? <p style={{ marginTop: 12, opacity: 0.8 }}>New here? Post your introduction in the composer below.</p> : null}
         </section>
 
@@ -275,15 +371,12 @@ export default function GroupThreadPage() {
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <h3 style={{ margin: 0 }}>Threads</h3>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className="button secondary" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Previous</button>
-              <span style={{ alignSelf: "center", opacity: 0.75 }}>Page {page} of {totalPages}</span>
-              <button className="button secondary" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Next</button>
-            </div>
+            <div style={{ opacity: 0.75 }}>{Math.min(visibleCount, messageTree.length)} of {messageTree.length} shown</div>
           </div>
           <div style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, minHeight: 220, background: "#fffafc", marginTop: 10 }}>
-            {paginatedRoots.length ? paginatedRoots.map((m) => renderThread(m)) : <p style={{ margin: 0, opacity: 0.7 }}>No group messages yet.</p>}
+            {visibleRoots.length ? visibleRoots.map((m) => renderThread(m)) : <p style={{ margin: 0, opacity: 0.7 }}>No group messages yet.</p>}
           </div>
+          {visibleCount < messageTree.length ? <div style={{ marginTop: 12 }}><button className="button secondary" onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}>Read more</button></div> : null}
         </section>
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>

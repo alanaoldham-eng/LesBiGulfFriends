@@ -208,7 +208,7 @@ function objectPathFromPublicUrl(bucket: string, url: string) {
   return idx >= 0 ? decodeURIComponent(url.slice(idx + marker.length)) : null;
 }
 
-export async function uploadPublicImage(bucket: "profile-photos" | "chat-media", userId: string, file: File) {
+export async function uploadPublicImage(bucket: "profile-photos" | "chat-media" | "warning-wall-photos", userId: string, file: File) {
   const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
   const path = `${userId}/${safeName}`;
   const { error } = await supabase.storage.from(bucket).upload(path, file, {

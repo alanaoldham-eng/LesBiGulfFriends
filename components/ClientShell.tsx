@@ -64,7 +64,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         setProfileOpen(false);
       }
     };
-
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
@@ -94,6 +93,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                 <Link href="/friends" style={menuItemStyle}>Friends & Invites</Link>
                 <Link href="/games" style={menuItemStyle}>Games</Link>
                 <Link href="/confessions" style={menuItemStyle}>Confessions</Link>
+                <Link href="/warning-wall" style={menuItemStyle}>The Warning Wall</Link>
                 <Link href="/availability" style={menuItemStyle}>Availability</Link>
                 <Link href="/proposals" style={menuItemStyle}>Proposals</Link>
                 <Link href="/events-app" style={menuItemStyle}>Events</Link>
@@ -119,107 +119,39 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                   >
                     🔔
                     {notifications.length ? (
-                      <span
-                        style={{
-                          position: "absolute",
-                          top: -6,
-                          right: -6,
-                          minWidth: 18,
-                          height: 18,
-                          padding: "0 5px",
-                          borderRadius: 999,
-                          background: "#8d2d5d",
-                          color: "#fff",
-                          fontSize: 11,
-                          fontWeight: 700,
-                          lineHeight: "18px",
-                          textAlign: "center",
-                        }}
-                      >
-                        {notifications.length}
-                      </span>
+                      <span style={{ position: "absolute", top: -6, right: -6, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999, background: "#8d2d5d", color: "#fff", fontSize: 11, fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>{notifications.length}</span>
                     ) : null}
                   </button>
-
                   {notifOpen ? (
-                    <div
-                      style={{
-                        ...panelStyle,
-                        right: 0,
-                        width: 340,
-                        maxWidth: "calc(100vw - 24px)",
-                        maxHeight: 420,
-                        overflow: "auto",
-                      }}
-                    >
+                    <div style={{ ...panelStyle, right: 0, width: 340, maxWidth: "calc(100vw - 24px)", maxHeight: 420, overflow: "auto" }}>
                       <div style={{ fontWeight: 700, marginBottom: 10 }}>Notifications</div>
                       {notifications.length ? (
                         <div style={{ display: "grid", gap: 10 }}>
                           {notifications.map((n: any) => (
-                            <Link
-                              key={n.id}
-                              href={n.href}
-                              style={{
-                                display: "block",
-                                padding: 12,
-                                borderRadius: 14,
-                                border: "1px solid #f1dfe8",
-                                background: "#fff8fb",
-                                textDecoration: "none",
-                                color: "inherit",
-                              }}
-                            >
+                            <Link key={n.id} href={n.href} style={{ display: "block", padding: 12, borderRadius: 14, border: "1px solid #f1dfe8", background: "#fff8fb", textDecoration: "none", color: "inherit" }}>
                               <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                                <div
-                                  style={{
-                                    width: 10,
-                                    height: 10,
-                                    borderRadius: 999,
-                                    background: "#8d2d5d",
-                                    marginTop: 5,
-                                    flex: "0 0 auto",
-                                  }}
-                                />
+                                <div style={{ width: 10, height: 10, borderRadius: 999, background: "#8d2d5d", marginTop: 5, flex: "0 0 auto" }} />
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                   <div style={{ fontWeight: 600, lineHeight: 1.45 }}>{n.text}</div>
-                                  {n.created_at ? (
-                                    <div style={{ fontSize: 12, opacity: 0.65, marginTop: 6 }}>
-                                      {new Date(n.created_at).toLocaleString()}
-                                    </div>
-                                  ) : null}
+                                  {n.created_at ? <div style={{ fontSize: 12, opacity: 0.65, marginTop: 6 }}>{new Date(n.created_at).toLocaleString()}</div> : null}
                                 </div>
                               </div>
                             </Link>
                           ))}
                         </div>
-                      ) : (
-                        <p style={{ margin: 0, opacity: 0.75 }}>No new notifications.</p>
-                      )}
+                      ) : <p style={{ margin: 0, opacity: 0.75 }}>No new notifications.</p>}
                     </div>
                   ) : null}
                 </div>
 
                 <div style={{ position: "relative" }}>
-                  <button
-                    className="button secondary"
-                    onClick={() => {
-                      setProfileOpen((v) => !v);
-                      setMenuOpen(false);
-                      setNotifOpen(false);
-                    }}
-                    aria-label="Open profile menu"
-                  >
-                    👤
-                  </button>
-
+                  <button className="button secondary" onClick={() => { setProfileOpen((v) => !v); setMenuOpen(false); setNotifOpen(false); }} aria-label="Open profile menu">👤</button>
                   {profileOpen ? (
                     <div style={{ ...panelStyle, right: 0, minWidth: 220, display: "grid", gap: 8 }}>
                       <Link href="/profile" style={menuItemStyle}>View Profile</Link>
                       <Link href="/profile" style={menuItemStyle}>Edit Profile</Link>
                       <Link href="/forgot-password" style={menuItemStyle}>Change Password</Link>
-                      <button style={menuItemStyle} onClick={() => signOutEverywhere()}>
-                        Logout
-                      </button>
+                      <button style={menuItemStyle} onClick={() => signOutEverywhere()}>Logout</button>
                     </div>
                   ) : null}
                 </div>
@@ -233,7 +165,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </div>
-
       {children}
     </>
   );
