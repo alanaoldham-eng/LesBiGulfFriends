@@ -57,8 +57,47 @@ function MessageCard({ m, me, friendIds, onAddFriend, onReplyStart, onReplyCance
             <Link href={`/members/${m.sender_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>{m.sender_id === me ? "You" : (m.profile?.display_name || m.sender_id)}</Link>
             {m.sender_id !== me && !isFriend ? <button className="button secondary" onClick={() => onAddFriend(m.sender_id)}>Add Friend</button> : null}
           </div>
-          {m.body ? <div style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{m.body}</div> : null}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+          <div style={{ marginTop: 6, whiteSpace: "pre-wrap", lineHeight: 1.4 }}>{m.body}</div>{m.body ? <div style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{m.body}</div> : null}
+
+            {m.link_url ? (
+              <div style={{ marginTop: 6 }}>
+                <a
+                  href={m.link_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: "#8d2d5d", textDecoration: "underline" }}
+                >
+                  {m.link_url}
+                </a>
+              </div>
+            ) : null}
+
+            {m.media_url ? (
+              <div style={{ marginTop: 8 }}>
+                {String(m.media_type || "").startsWith("image/") ? (
+                  <img
+                    src={m.media_url}
+                    alt="Attachment"
+                    style={{
+                      maxWidth: "100%",
+                      borderRadius: 14,
+                      border: "1px solid #ead5df",
+                    }}
+                  />
+                ) : (
+                  <a
+                    href={m.media_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ color: "#8d2d5d", textDecoration: "underline" }}
+                  >
+                    Open attachment
+                  </a>
+                )}
+              </div>
+            ) : null}
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
             <button type="button" className="button secondary" onClick={() => onReplyStart(String(m.id))}>Reply</button>
             {EMOJIS.map((emoji) => <button key={emoji} className="button secondary" onClick={() => onReact(m.id, emoji)}>{emoji} {grouped.get(emoji) || ""}</button>)}
           </div>
