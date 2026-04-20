@@ -22,6 +22,7 @@ import {
 } from "../../../lib/db";
 import { listGroupMessagesDetailedUnlimited } from "../../../lib/groupMessagesDetailed";
 import { createCommunityGroup } from "../../../lib/community";
+import { editGroupMessageByAuthor } from "../../../lib/messageEditing";
 
 async function sendFriendRequestEmailNotification(recipientUserId: string, requesterName: string) {
   try {
@@ -41,12 +42,34 @@ function formatKarma(value: any) {
   return Number.isInteger(num) ? String(num) : num.toFixed(1).replace(/\.0$/, "");
 }
 
-function MessageCard({ m, me, friendIds, onAddFriend, onReplyStart, onReplyCancel, onReplySend, onReact, openReplyId, draftReply, setDraftReply, setAttachment, linkUrl, setLinkUrl }: any) {
+function MessageCard({
+  m,
+  me,
+  friendIds,
+  onAddFriend,
+  onReplyStart,
+  onReplyCancel,
+  onReplySend,
+  onReact,
+  openReplyId,
+  draftReply,
+  setDraftReply,
+  setAttachment,
+  linkUrl,
+  setLinkUrl,
+  onEditStart,
+  onEditSave,
+  onEditCancel,
+  editingId,
+  editingBody,
+  setEditingBody,
+}: any) {
   const mainPhoto = m.profile?.photo_urls?.[0] || m.profile?.photo_url || null;
   const isFriend = friendIds.has(m.sender_id);
   const grouped = new Map<string, number>();
   (m.reactions || []).forEach((r: any) => grouped.set(r.emoji, (grouped.get(r.emoji) || 0) + 1));
   const isOpen = openReplyId === String(m.id);
+  const isEditing = editingId === String(m.id);
 
   return (
     <div style={{ marginBottom: 14, paddingLeft: m.parent_message_id ? 20 : 0, borderLeft: m.parent_message_id ? "3px solid #f1dfe8" : "none" }}>
@@ -54,53 +77,51 @@ function MessageCard({ m, me, friendIds, onAddFriend, onReplyStart, onReplyCance
         {mainPhoto ? <img src={mainPhoto} alt={m.profile?.display_name || "Member"} style={{ width: 38, height: 38, borderRadius: 999, objectFit: "cover", border: "1px solid #ead5df" }} /> : null}
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <Link href={`/members/${m.sender_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>{m.sender_id === me ? "You" : (m.profile?.display_name || m.sender_id)}</Link>
+            <Link href={`/members/${m.sender_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>
+              {m.sender_id === me ? "You" : m.profile?.display_name || m.sender_id}
+            </Link>
             {m.sender_id !== me && !isFriend ? <button className="button secondary" onClick={() => onAddFriend(m.sender_id)}>Add Friend</button> : null}
+            {m.sender_id === me ? <button className="button secondary" onClick={() => onEditStart(m)}>Edit</button> : null}
+            {m.edited_at ? <span style={{ opacity: 0.55, fontSize: 12 }}>edited</span> : null}
           </div>
-          <div style={{ marginTop: 6, whiteSpace: "pre-wrap", lineHeight: 1.4 }}>{m.body}</div>{m.body ? <div style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{m.body}</div> : null}
 
-            {m.link_url ? (
-              <div style={{ marginTop: 6 }}>
-                <a
-                  href={m.link_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ color: "#8d2d5d", textDecoration: "underline" }}
-                >
-                  {m.link_url}
-                </a>
+          {isEditing ? (
+            <div style={{ marginTop: 10, display: "grid", gap: 10, border: "1px solid #f1dfe8", borderRadius: 14, padding: 10, background: "#fffafc" }}>
+              <textarea value={editingBody} onChange={(e) => setEditingBody(e.target.value)} style={{ minHeight: 90, padding: "12px 14px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 15 }} />
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button className="button" onClick={() => onEditSave(m.id)}>Save edit</button>
+                <button className="button secondary" onClick={onEditCancel}>Cancel</button>
               </div>
-            ) : null}
-
-            {m.media_url ? (
-              <div style={{ marginTop: 8 }}>
-                {String(m.media_type || "").startsWith("image/") ? (
-                  <img
-                    src={m.media_url}
-                    alt="Attachment"
-                    style={{
-                      maxWidth: "100%",
-                      borderRadius: 14,
-                      border: "1px solid #ead5df",
-                    }}
-                  />
-                ) : (
-                  <a
-                    href={m.media_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ color: "#8d2d5d", textDecoration: "underline" }}
-                  >
-                    Open attachment
+            </div>
+          ) : (
+            <>
+              {m.body ? <div style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{m.body}</div> : null}
+              {m.link_url ? (
+                <div style={{ marginTop: 6 }}>
+                  <a href={m.link_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>
+                    {m.link_url}
                   </a>
-                )}
-              </div>
-            ) : null}
+                </div>
+              ) : null}
+              {m.media_url ? (
+                <div style={{ marginTop: 8 }}>
+                  {String(m.media_type || "").startsWith("image/") ? (
+                    <img src={m.media_url} alt="Attachment" style={{ maxWidth: "100%", borderRadius: 14, border: "1px solid #ead5df" }} />
+                  ) : (
+                    <a href={m.media_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>
+                      Open attachment
+                    </a>
+                  )}
+                </div>
+              ) : null}
+            </>
+          )}
 
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
             <button type="button" className="button secondary" onClick={() => onReplyStart(String(m.id))}>Reply</button>
             {EMOJIS.map((emoji) => <button key={emoji} className="button secondary" onClick={() => onReact(m.id, emoji)}>{emoji} {grouped.get(emoji) || ""}</button>)}
           </div>
+
           {isOpen ? (
             <div style={{ marginTop: 10, display: "grid", gap: 10, border: "1px solid #f1dfe8", borderRadius: 14, padding: 10, background: "#fffafc" }}>
               <textarea value={draftReply} onChange={(e) => setDraftReply(e.target.value)} placeholder="Reply here" style={{ minHeight: 90, padding: "12px 14px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 15 }} />
@@ -112,9 +133,31 @@ function MessageCard({ m, me, friendIds, onAddFriend, onReplyStart, onReplyCance
               </div>
             </div>
           ) : null}
+
           {(m.children || []).map((child: any) => (
             <div key={child.id} style={{ marginTop: 12 }}>
-              <MessageCard m={child} me={me} friendIds={friendIds} onAddFriend={onAddFriend} onReplyStart={onReplyStart} onReplyCancel={onReplyCancel} onReplySend={onReplySend} onReact={onReact} openReplyId={openReplyId} draftReply={draftReply} setDraftReply={setDraftReply} setAttachment={setAttachment} linkUrl={linkUrl} setLinkUrl={setLinkUrl} />
+              <MessageCard
+                m={child}
+                me={me}
+                friendIds={friendIds}
+                onAddFriend={onAddFriend}
+                onReplyStart={onReplyStart}
+                onReplyCancel={onReplyCancel}
+                onReplySend={onReplySend}
+                onReact={onReact}
+                openReplyId={openReplyId}
+                draftReply={draftReply}
+                setDraftReply={setDraftReply}
+                setAttachment={setAttachment}
+                linkUrl={linkUrl}
+                setLinkUrl={setLinkUrl}
+                onEditStart={onEditStart}
+                onEditSave={onEditSave}
+                onEditCancel={onEditCancel}
+                editingId={editingId}
+                editingBody={editingBody}
+                setEditingBody={setEditingBody}
+              />
             </div>
           ))}
         </div>
@@ -151,6 +194,8 @@ export default function GroupThreadPage() {
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupDescription, setNewGroupDescription] = useState("");
   const [newGroupPrivate, setNewGroupPrivate] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingMessageBody, setEditingMessageBody] = useState("");
 
   const canModerate = membership?.role === "owner" || membership?.role === "mod";
   const isOwner = membership?.role === "owner";
@@ -165,8 +210,15 @@ export default function GroupThreadPage() {
       getMyProfile(uid).catch(() => null),
       getPublicAndMemberGroups(uid).catch(() => []),
     ]);
-    setGroup(groupRow); setMembership(membershipRow); setMembers(memberRows); setMessages(messageRows); setFriendIds(fids);
-    setMyName(myProfile?.display_name || "A member"); setMyKarma(Number(myProfile?.karma_points || 0)); setNeedsOnboarding(!isProfileComplete(myProfile)); setAllGroups(groups);
+    setGroup(groupRow);
+    setMembership(membershipRow);
+    setMembers(memberRows);
+    setMessages(messageRows);
+    setFriendIds(fids);
+    setMyName(myProfile?.display_name || "A member");
+    setMyKarma(Number(myProfile?.karma_points || 0));
+    setNeedsOnboarding(!isProfileComplete(myProfile));
+    setAllGroups(groups);
   };
 
   useEffect(() => {
@@ -185,9 +237,13 @@ export default function GroupThreadPage() {
     const roots: any[] = [];
     nodes.forEach((node: any) => {
       const parentId = node.parent_message_id ? String(node.parent_message_id) : null;
-      if (parentId && nodes.has(parentId)) nodes.get(parentId).children.push(node); else roots.push(node);
+      if (parentId && nodes.has(parentId)) nodes.get(parentId).children.push(node);
+      else roots.push(node);
     });
-    const sortDesc = (arr: any[]) => { arr.sort((a, b) => (a.created_at < b.created_at ? 1 : -1)); arr.forEach((item) => sortDesc(item.children || [])); };
+    const sortDesc = (arr: any[]) => {
+      arr.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+      arr.forEach((item) => sortDesc(item.children || []));
+    };
     sortDesc(roots);
     return roots;
   }, [messages]);
@@ -197,42 +253,94 @@ export default function GroupThreadPage() {
   const send = async () => {
     if (!groupId || !me || (!body.trim() && !linkUrl.trim() && !attachment)) return;
     try {
-      let mediaUrl: string | null = null, mediaType: string | null = null;
-      if (attachment) { mediaUrl = await uploadPublicImage("chat-media", me, attachment); mediaType = attachment.type || "application/octet-stream"; }
+      let mediaUrl: string | null = null;
+      let mediaType: string | null = null;
+      if (attachment) {
+        mediaUrl = await uploadPublicImage("chat-media", me, attachment);
+        mediaType = attachment.type || "application/octet-stream";
+      }
       await sendGroupReply(groupId, me, body.trim(), null, mediaUrl, mediaType, linkUrl.trim() || null);
-      setBody(""); setLinkUrl(""); setAttachment(null); await refresh(me);
-    } catch (e: any) { setStatus(e.message || "Unable to send group message."); }
+      setBody("");
+      setLinkUrl("");
+      setAttachment(null);
+      await refresh(me);
+    } catch (e: any) {
+      setStatus(e.message || "Unable to send group message.");
+    }
   };
 
   const sendReply = async (parentMessageId: string) => {
     if (!groupId || !me || (!replyBody.trim() && !replyLinkUrl.trim() && !replyAttachment)) return;
     try {
-      let mediaUrl: string | null = null, mediaType: string | null = null;
-      if (replyAttachment) { mediaUrl = await uploadPublicImage("chat-media", me, replyAttachment); mediaType = replyAttachment.type || "application/octet-stream"; }
+      let mediaUrl: string | null = null;
+      let mediaType: string | null = null;
+      if (replyAttachment) {
+        mediaUrl = await uploadPublicImage("chat-media", me, replyAttachment);
+        mediaType = replyAttachment.type || "application/octet-stream";
+      }
       await sendGroupReply(groupId, me, replyBody.trim(), parentMessageId, mediaUrl, mediaType, replyLinkUrl.trim() || null);
-      setReplyTo(null); setReplyBody(""); setReplyLinkUrl(""); setReplyAttachment(null); await refresh(me);
-    } catch (e: any) { setStatus(e.message || "Unable to send group reply."); }
+      setReplyTo(null);
+      setReplyBody("");
+      setReplyLinkUrl("");
+      setReplyAttachment(null);
+      await refresh(me);
+    } catch (e: any) {
+      setStatus(e.message || "Unable to send group reply.");
+    }
+  };
+
+  const saveEdit = async (messageId: string) => {
+    try {
+      await editGroupMessageByAuthor(messageId, me, editingMessageBody);
+      setEditingMessageId(null);
+      setEditingMessageBody("");
+      await refresh(me);
+      setStatus("Message updated.");
+    } catch (e: any) {
+      setStatus(e.message || "Unable to edit message.");
+    }
   };
 
   const addFriend = async (userId: string) => {
     try {
       const result: any = await sendFriendRequest(me, userId);
       setStatus(result?.duplicate ? "Friend request already pending." : "Friend request sent.");
-      if (!result?.duplicate) { setFriendIds(new Set<string>([...Array.from(friendIds), userId])); await sendFriendRequestEmailNotification(userId, myName); }
-    } catch (e: any) { setStatus(e.message || "Unable to send friend request."); }
+      if (!result?.duplicate) {
+        setFriendIds(new Set<string>([...Array.from(friendIds), userId]));
+        await sendFriendRequestEmailNotification(userId, myName);
+      }
+    } catch (e: any) {
+      setStatus(e.message || "Unable to send friend request.");
+    }
   };
 
   const react = async (messageId: string, emoji: string) => {
     if (!groupId || !me) return;
-    try { await reactToGroupMessage(groupId, messageId, me, emoji); await refresh(me); } catch (e: any) { setStatus(e.message || "Unable to react to message."); }
+    try {
+      await reactToGroupMessage(groupId, messageId, me, emoji);
+      await refresh(me);
+    } catch (e: any) {
+      setStatus(e.message || "Unable to react to message.");
+    }
   };
 
   const createGroup = async () => {
     if (!me || myKarma < 1) return setStatus("You need at least 1 karma to create a group.");
     try {
-      const created = await createCommunityGroup({ name: newGroupName, description: newGroupDescription, isPrivate: newGroupPrivate, createdBy: me });
-      setCreateGroupOpen(false); setNewGroupName(""); setNewGroupDescription(""); setNewGroupPrivate(false); router.push(`/groups-app/${created.id}`);
-    } catch (e: any) { setStatus(e.message || "Unable to create group."); }
+      const created = await createCommunityGroup({
+        name: newGroupName,
+        description: newGroupDescription,
+        isPrivate: newGroupPrivate,
+        createdBy: me,
+      });
+      setCreateGroupOpen(false);
+      setNewGroupName("");
+      setNewGroupDescription("");
+      setNewGroupPrivate(false);
+      router.push(`/groups-app/${created.id}`);
+    } catch (e: any) {
+      setStatus(e.message || "Unable to create group.");
+    }
   };
 
   const postPlaceholder = String(group?.name || "").toLowerCase() === "main" ? "Introduce yourself to the Main group" : `Post to ${group?.name || "group"}`;
@@ -284,7 +392,42 @@ export default function GroupThreadPage() {
             <div style={{ opacity: 0.75 }}>{Math.min(visibleCount, messageTree.length)} of {messageTree.length} shown</div>
           </div>
           <div style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, minHeight: 220, background: "#fffafc", marginTop: 10 }}>
-            {visibleRoots.length ? visibleRoots.map((m) => <MessageCard key={m.id} m={m} me={me} friendIds={friendIds} onAddFriend={addFriend} onReplyStart={setReplyTo} onReplyCancel={() => { setReplyTo(null); setReplyBody(""); setReplyLinkUrl(""); setReplyAttachment(null); }} onReplySend={sendReply} onReact={react} openReplyId={replyTo} draftReply={replyBody} setDraftReply={setReplyBody} setAttachment={setReplyAttachment} linkUrl={replyLinkUrl} setLinkUrl={setReplyLinkUrl} />) : <p style={{ margin: 0, opacity: 0.7 }}>No group messages yet.</p>}
+            {visibleRoots.length ? visibleRoots.map((m) => (
+              <MessageCard
+                key={m.id}
+                m={m}
+                me={me}
+                friendIds={friendIds}
+                onAddFriend={addFriend}
+                onReplyStart={setReplyTo}
+                onReplyCancel={() => {
+                  setReplyTo(null);
+                  setReplyBody("");
+                  setReplyLinkUrl("");
+                  setReplyAttachment(null);
+                }}
+                onReplySend={sendReply}
+                onReact={react}
+                openReplyId={replyTo}
+                draftReply={replyBody}
+                setDraftReply={setReplyBody}
+                setAttachment={setReplyAttachment}
+                linkUrl={replyLinkUrl}
+                setLinkUrl={setReplyLinkUrl}
+                onEditStart={(msg: any) => {
+                  setEditingMessageId(String(msg.id));
+                  setEditingMessageBody(msg.body || "");
+                }}
+                onEditSave={saveEdit}
+                onEditCancel={() => {
+                  setEditingMessageId(null);
+                  setEditingMessageBody("");
+                }}
+                editingId={editingMessageId}
+                editingBody={editingMessageBody}
+                setEditingBody={setEditingMessageBody}
+              />
+            )) : <p style={{ margin: 0, opacity: 0.7 }}>No group messages yet.</p>}
           </div>
           {visibleCount < messageTree.length ? <div style={{ marginTop: 12 }}><button className="button secondary" onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}>Read more</button></div> : null}
         </section>
