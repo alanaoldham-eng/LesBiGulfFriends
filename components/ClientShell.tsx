@@ -91,14 +91,14 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                 <Link href="/groups-app" style={menuItemStyle}>Groups</Link>
                 <Link href="/messages" style={menuItemStyle}>Messages</Link>
                 <Link href="/friends" style={menuItemStyle}>Friends & Invites</Link>
+                <Link href="/events-app" style={menuItemStyle}>Events</Link>
                 <Link href="/games" style={menuItemStyle}>Games</Link>
                 <Link href="/confessions" style={menuItemStyle}>Confessions</Link>
                 <Link href="/warning-wall" style={menuItemStyle}>The Warning Wall</Link>
                 <Link href="/availability" style={menuItemStyle}>Availability</Link>
                 <Link href="/proposals" style={menuItemStyle}>Proposals</Link>
-                <Link href="/events-app" style={menuItemStyle}>Events</Link>
                 <Link href="/feedback" style={menuItemStyle}>Bug / Feature</Link>
-                {isAdmin ? <Link href="/admin-rewards" style={menuItemStyle}>Reward Karma</Link> : null}
+                {isAdmin ? <Link href="/admin-rewards" style={menuItemStyle}>Admin Magic Wand</Link> : null}
               </div>
             ) : null}
           </div>
@@ -119,7 +119,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                   >
                     🔔
                     {notifications.length ? (
-                      <span style={{ position: "absolute", top: -6, right: -6, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999, background: "#8d2d5d", color: "#fff", fontSize: 11, fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>{notifications.length}</span>
+                      <span style={{ position: "absolute", top: -6, right: -6, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999, background: "#8d2d5d", color: "#fff", fontSize: 11, fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>
+                        {notifications.length}
+                      </span>
                     ) : null}
                   </button>
                   {notifOpen ? (
@@ -128,7 +130,12 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                       {notifications.length ? (
                         <div style={{ display: "grid", gap: 10 }}>
                           {notifications.map((n: any) => (
-                            <Link key={n.id} href={n.href} style={{ display: "block", padding: 12, borderRadius: 14, border: "1px solid #f1dfe8", background: "#fff8fb", textDecoration: "none", color: "inherit" }}>
+                            <Link
+                              key={n.id}
+                              href={n.href}
+                              onClick={() => setNotifOpen(false)}
+                              style={{ display: "block", padding: 12, borderRadius: 14, border: "1px solid #f1dfe8", background: "#fff8fb", textDecoration: "none", color: "inherit" }}
+                            >
                               <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                                 <div style={{ width: 10, height: 10, borderRadius: 999, background: "#8d2d5d", marginTop: 5, flex: "0 0 auto" }} />
                                 <div style={{ flex: 1, minWidth: 0 }}>

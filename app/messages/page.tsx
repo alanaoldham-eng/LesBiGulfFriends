@@ -1,11 +1,13 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { ClientShell } from "../../components/ClientShell";
 import { EmptyState } from "../../components/EmptyState";
 import { getCurrentUser } from "../../lib/auth";
 import { listFriends, listDmMessages, sendDm, uploadPublicImage, getMyProfile } from "../../lib/db";
+import { markNotificationRead } from "../../lib/notificationSettings";
 
 async function sendPrivateMessageEmailNotification(recipientUserId: string, senderName: string, snippet: string) {
   try {
@@ -45,6 +47,11 @@ function MessageAttachment({ m, senderName }: { m: any; senderName: string }) {
 }
 
 export default function MessagesPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const threadId = searchParams?.get("thread") || "";
+  const notificationId = searchParams?.get("notification") || "";
+
   const [me, setMe] = useState("");
   const [friends, setFriends] = useState<any[]>([]);
   const [selected, setSelected] = useState<any | null>(null);
@@ -54,6 +61,18 @@ export default function MessagesPage() {
   const [attachment, setAttachment] = useState<File | null>(null);
   const [status, setStatus] = useState("");
   const [myName, setMyName] = useState("A member");
+
+  const friendsById = useMemo(() => new Map(friends.map((f: any) => [f.id, f])), [friends]);
+
+  const openThread = async (friend: any, shouldMarkRead = false) => {
+    setSelected(friend);
+    const msgs = await listDmMessages(me, friend.id).catch(() => []);
+    setMessages(msgs);
+    if (shouldMarkRead && me && notificationId) {
+      await markNotificationRead(me, notificationId).catch(() => null);
+      router.replace(`/messages?thread=${encodeURIComponent(friend.id)}`);
+    }
+  };
 
   useEffect(() => {
     const run = async () => {
@@ -70,11 +89,13 @@ export default function MessagesPage() {
     run();
   }, []);
 
-  const openThread = async (friend: any) => {
-    setSelected(friend);
-    const msgs = await listDmMessages(me, friend.id).catch(() => []);
-    setMessages(msgs);
-  };
+  useEffect(() => {
+    if (!me || !threadId || !friends.length) return;
+    const friend = friendsById.get(threadId);
+    if (friend) {
+      openThread(friend, Boolean(notificationId));
+    }
+  }, [me, threadId, notificationId, friends.length, friendsById]);
 
   const send = async () => {
     if (!selected) return;
@@ -125,25 +146,11 @@ export default function MessagesPage() {
             <div style={{ display: "grid", gap: 10 }}>
               <div style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, minHeight: 180, background: "#fffafc" }}>
                 {messages.length ? messages.map((m) => (
-                  <MessageAttachment
-                    key={m.id}
-                    m={m}
-                    senderName={m.sender_id === me ? "You" : selected.display_name}
-                  />
+                  <MessageAttachment key={m.id} m={m} senderName={m.sender_id === me ? "You" : selected.display_name} />
                 )) : <p style={{ margin: 0, opacity: 0.7 }}>No messages yet.</p>}
               </div>
-              <textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                placeholder="Type a message"
-                style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
-              />
-              <input
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                placeholder="Optional link"
-                style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
-              />
+              <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Type a message" style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+              <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="Optional link" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
               <input type="file" accept="image/*,.pdf,.doc,.docx,.txt,.zip" onChange={(e) => setAttachment(e.target.files?.[0] || null)} />
               <button className="button" onClick={send}>Send message</button>
             </div>
