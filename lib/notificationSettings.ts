@@ -10,14 +10,6 @@ export type EmailNotificationSettings = {
   email_event_invites?: boolean | null;
 };
 
-export type InAppNotification = {
-  id: string;
-  type: string;
-  text: string;
-  href: string;
-  created_at: string;
-};
-
 export async function getEmailNotificationSettings(userId: string) {
   const { data, error } = await supabase
     .from("notification_settings")
@@ -27,13 +19,13 @@ export async function getEmailNotificationSettings(userId: string) {
 
   if (error) throw error;
 
-  return (data || {
+  return data || {
     user_id: userId,
     email_friend_requests: false,
     email_private_messages: false,
     email_breakfast_reminders: false,
     email_event_invites: false,
-  }) as EmailNotificationSettings;
+  };
 }
 
 export async function upsertEmailNotificationSettings(settings: EmailNotificationSettings) {
@@ -54,10 +46,7 @@ export async function upsertEmailNotificationSettings(settings: EmailNotificatio
   if (readError) throw readError;
 
   if (existing?.user_id) {
-    const { error } = await supabase
-      .from("notification_settings")
-      .update(payload)
-      .eq("user_id", settings.user_id);
+    const { error } = await supabase.from("notification_settings").update(payload).eq("user_id", settings.user_id);
     if (error) throw error;
     return;
   }
@@ -76,32 +65,16 @@ export async function markNotificationRead(userId: string, notificationId: strin
 }
 
 export async function listInAppNotifications(userId: string) {
-  const notifications: InAppNotification[] = [];
+  const notifications: any[] = [];
 
   const [{ data: readRows }, { data: reqs }, { data: msgs }] = await Promise.all([
     supabase.from("notification_reads").select("notification_id").eq("user_id", userId),
-    supabase
-      .from("friend_requests")
-      .select("id, from_user, created_at, status")
-      .eq("to_user", userId)
-      .eq("status", "pending")
-      .order("created_at", { ascending: false })
-      .limit(20),
-    supabase
-      .from("messages")
-      .select("id, sender_id, created_at")
-      .eq("recipient_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(20),
+    supabase.from("friend_requests").select("id, from_user, created_at, status").eq("to_user", userId).eq("status", "pending").order("created_at", { ascending: false }).limit(20),
+    supabase.from("messages").select("id, sender_id, created_at").eq("recipient_id", userId).order("created_at", { ascending: false }).limit(20),
   ]);
 
   const readSet = new Set((readRows || []).map((r: any) => r.notification_id));
-  const profileIds = [
-    ...new Set([
-      ...(reqs || []).map((r: any) => r.from_user),
-      ...(msgs || []).map((m: any) => m.sender_id),
-    ]),
-  ];
+  const profileIds = [...new Set([...(reqs || []).map((r: any) => r.from_user), ...(msgs || []).map((m: any) => m.sender_id)])];
 
   let names = new Map<string, string>();
   if (profileIds.length) {
@@ -109,9 +82,9 @@ export async function listInAppNotifications(userId: string) {
     names = new Map((profiles || []).map((p: any) => [p.id, p.display_name || "A member"]));
   }
 
-  (reqs || []).forEach((r: any) => {
+  for (const r of reqs || []) {
     const id = `fr-${r.id}`;
-    if (readSet.has(id)) return;
+    if (readSet.has(id)) continue;
     notifications.push({
       id,
       type: "friend_request",
@@ -119,11 +92,11 @@ export async function listInAppNotifications(userId: string) {
       href: "/friends",
       created_at: r.created_at,
     });
-  });
+  }
 
-  (msgs || []).forEach((m: any) => {
+  for (const m of msgs || []) {
     const id = `dm-${m.id}`;
-    if (readSet.has(id)) return;
+    if (readSet.has(id)) continue;
     notifications.push({
       id,
       type: "private_message",
@@ -131,9 +104,7 @@ export async function listInAppNotifications(userId: string) {
       href: `/messages?thread=${encodeURIComponent(m.sender_id)}&notification=${encodeURIComponent(id)}`,
       created_at: m.created_at,
     });
-  });
+  }
 
-  return notifications
-    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
-    .slice(0, 25);
+  return notifications.sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, 25);
 }

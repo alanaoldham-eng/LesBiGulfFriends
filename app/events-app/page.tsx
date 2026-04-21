@@ -30,6 +30,7 @@ import {
 } from "../../lib/eventFeatures";
 import { editEventMessageByAuthor } from "../../lib/messageEditing";
 import { getViewerRoleFlags } from "../../lib/roadmap";
+import { deleteEventByOwner } from "../../lib/eventCrud";
 
 const EMOJIS = ["❤️", "👍", "😂", "🔥", "👏"];
 
@@ -45,9 +46,7 @@ function EventMessageCard({ m, me, friendIds, onAddFriend, onReply, onReact, onE
         {mainPhoto ? <img src={mainPhoto} alt={m.profile?.display_name || "Member"} style={{ width: 38, height: 38, borderRadius: 999, objectFit: "cover", border: "1px solid #ead5df" }} /> : null}
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <Link href={`/members/${m.sender_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>
-              {m.sender_id === me ? "You" : (m.profile?.display_name || m.sender_id)}
-            </Link>
+            <Link href={`/members/${m.sender_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>{m.sender_id === me ? "You" : (m.profile?.display_name || m.sender_id)}</Link>
             {m.sender_id !== me && !isFriend ? <button className="button secondary" onClick={() => onAddFriend(m.sender_id)}>Add Friend</button> : null}
             {m.parent_message_id ? <span style={{ opacity: 0.6, fontSize: 12 }}>Reply</span> : null}
             {m.sender_id === me ? <button className="button secondary" onClick={() => onEditStart(m)}>Edit</button> : null}
@@ -66,15 +65,7 @@ function EventMessageCard({ m, me, friendIds, onAddFriend, onReply, onReact, onE
             <>
               {m.body ? <div style={{ marginTop: 4, whiteSpace: "pre-wrap" }}>{m.body}</div> : null}
               {m.link_url ? <div style={{ marginTop: 6 }}><a href={m.link_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>{m.link_url}</a></div> : null}
-              {m.media_url ? (
-                <div style={{ marginTop: 8 }}>
-                  {String(m.media_type || "").startsWith("image/") ? (
-                    <img src={m.media_url} alt="Attachment" style={{ maxWidth: "100%", borderRadius: 14, border: "1px solid #ead5df" }} />
-                  ) : (
-                    <a href={m.media_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>Open attachment</a>
-                  )}
-                </div>
-              ) : null}
+              {m.media_url ? <div style={{ marginTop: 8 }}>{String(m.media_type || "").startsWith("image/") ? <img src={m.media_url} alt="Attachment" style={{ maxWidth: "100%", borderRadius: 14, border: "1px solid #ead5df" }} /> : <a href={m.media_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>Open attachment</a>}</div> : null}
             </>
           )}
 
@@ -98,7 +89,6 @@ export default function EventsAppPage() {
   const [linkUrl, setLinkUrl] = useState("");
   const [isPublic, setIsPublic] = useState(true);
   const [coverFile, setCoverFile] = useState<File | null>(null);
-
   const [events, setEvents] = useState<any[]>([]);
   const [friends, setFriends] = useState<any[]>([]);
   const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
@@ -124,19 +114,10 @@ export default function EventsAppPage() {
   const [awardOptions, setAwardOptions] = useState<any[]>([]);
 
   const nowTs = Date.now();
-  const selectedEventDateLabel = useMemo(() => {
-    if (!selectedEvent?.starts_at) return "";
-    try { return new Date(selectedEvent.starts_at).toLocaleDateString(); }
-    catch { return String(selectedEvent.starts_at); }
-  }, [selectedEvent]);
-
-  const upcomingEvents = useMemo(() => [...events]
-    .filter((ev: any) => new Date(ev.starts_at).getTime() >= nowTs)
-    .sort((a: any, b: any) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()), [events, nowTs]);
-
-  const pastEvents = useMemo(() => [...events]
-    .filter((ev: any) => new Date(ev.starts_at).getTime() < nowTs)
-    .sort((a: any, b: any) => new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime()), [events, nowTs]);
+  const selectedEventDateLabel = useMemo(() => selectedEvent?.starts_at ? new Date(selectedEvent.starts_at).toLocaleDateString() : "", [selectedEvent]);
+  const upcomingEvents = useMemo(() => [...events].filter((ev: any) => new Date(ev.starts_at).getTime() >= nowTs).sort((a: any, b: any) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()), [events, nowTs]);
+  const pastEvents = useMemo(() => [...events].filter((ev: any) => new Date(ev.starts_at).getTime() < nowTs).sort((a: any, b: any) => new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime()), [events, nowTs]);
+  const selectedEventIsPast = selectedEvent ? new Date(selectedEvent.starts_at).getTime() < nowTs : false;
 
   const refreshEvents = async (uid: string) => {
     const [rows, profile, fids, friendRows, roleFlags] = await Promise.all([
@@ -148,11 +129,10 @@ export default function EventsAppPage() {
     ]);
     setEvents(rows);
     setDisplayName(profile?.display_name || "A member");
-    setKarmaPoints(Number(profile?.karma_points || 0));
     setFriendIds(fids);
     setFriends(friendRows || []);
+    setKarmaPoints(Number(profile?.karma_points || 0));
     setCanReview(!!roleFlags?.canReview);
-    if (selectedEvent) await openEvent(selectedEvent);
   };
 
   useEffect(() => {
@@ -164,16 +144,6 @@ export default function EventsAppPage() {
     };
     run();
   }, []);
-
-  const sendEventInviteEmail = async (email: string, eventTitle: string, eventStartsAt: string, eventLocation: string) => {
-    const res = await fetch("/api/events/send-invite", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ inviteeEmail: email, inviterName: displayName, eventTitle, startsAt: eventStartsAt, location: eventLocation }),
-    });
-    const data = await res.json();
-    return { ok: res.ok, ...data };
-  };
 
   const buildAwardOptions = async (ev: any, invs: any[]) => {
     const ids = Array.from(new Set([ev.created_by, ...(invs || []).map((x: any) => x.invitee_user_id).filter(Boolean)]));
@@ -216,49 +186,100 @@ export default function EventsAppPage() {
 
       if (editingEvent && selectedEvent?.id) {
         await updateEventByOwner(selectedEvent.id, me, {
-          title, description: description || null, starts_at: startsAt, location: location || null,
-          cover_image_url: coverImageUrl, link_url: linkUrl || null, is_public: isPublic,
+          title,
+          description: description || null,
+          starts_at: startsAt,
+          location: location || null,
+          cover_image_url: coverImageUrl,
+          link_url: linkUrl || null,
+          is_public: isPublic,
         });
         setStatus("Event updated.");
-        await openEvent({ ...selectedEvent, title, description, starts_at: startsAt, location, cover_image_url: coverImageUrl, link_url: linkUrl, is_public: isPublic });
       } else {
-        const ev = await createEvent({ title, description, starts_at: startsAt, location, created_by: me });
-        await updateEventByOwner(ev.id, me, { cover_image_url: coverImageUrl, link_url: linkUrl || null, is_public: isPublic });
+        const ev = await createEvent({
+          title,
+          description,
+          starts_at: startsAt,
+          location,
+          created_by: me,
+        });
+
+        await updateEventByOwner(ev.id, me, {
+          cover_image_url: coverImageUrl,
+          link_url: linkUrl || null,
+          is_public: isPublic,
+        });
 
         if (isPublic) {
           await fetch("/api/events/invite", {
-            method: "POST", headers: { "Content-Type": "application/json" },
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ mode: "public", eventId: ev.id, ownerId: me }),
           });
         } else if (selectedFriendIds.length) {
           await fetch("/api/events/invite", {
-            method: "POST", headers: { "Content-Type": "application/json" },
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ mode: "private", eventId: ev.id, ownerId: me, friendIds: selectedFriendIds }),
           });
         }
 
-        setTitle(""); setDescription(""); setStartsAt(""); setLocation(""); setLinkUrl(""); setIsPublic(true); setCoverFile(null);
+        setStatus("Event created.");
       }
+
+      setTitle("");
+      setDescription("");
+      setStartsAt("");
+      setLocation("");
+      setLinkUrl("");
+      setIsPublic(true);
+      setCoverFile(null);
+      setSelectedFriendIds([]);
+      await refreshEvents(me);
     } catch (e: any) {
       setStatus(e.message || "Unable to save event.");
-      return;
     }
-    setSelectedFriendIds([]);
-    await refreshEvents(me);
-    setStatus((editingEvent ? "Event updated." : "Event created."));
+  };
+
+  const deleteEvent = async () => {
+    if (!selectedEvent?.id || selectedEvent.created_by !== me) return;
+    try {
+      await deleteEventByOwner(selectedEvent.id, me);
+      setSelectedEvent(null);
+      setEventInvites([]);
+      setEventMessages([]);
+      setEventMedia([]);
+      await refreshEvents(me);
+      setStatus("Event deleted.");
+    } catch (e: any) {
+      setStatus(e.message || "Unable to delete event.");
+    }
+  };
+
+  const sendEventInviteEmail = async (email: string, eventTitle: string, eventStartsAt: string, eventLocation: string) => {
+    const res = await fetch("/api/events/send-invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inviteeEmail: email, inviterName: displayName, eventTitle, startsAt: eventStartsAt, location: eventLocation }),
+    });
+    const data = await res.json();
+    return { ok: res.ok, ...data };
   };
 
   const inviteSingle = async () => {
-    if (!selectedEvent || !inviteEmail.trim()) return;
+    if (!selectedEvent || !inviteEmail.trim() || selectedEventIsPast) return;
     try {
       const localRow = await sendEventInviteEmail(inviteEmail.trim(), selectedEvent.title, selectedEvent.starts_at, selectedEvent.location || "");
       setStatus(localRow.ok ? "Invite email sent." : localRow.error || "Invite email failed.");
       setInviteEmail("");
       await openEvent(selectedEvent);
-    } catch (e: any) { setStatus(e.message || "Unable to send event invite."); }
+    } catch (e: any) {
+      setStatus(e.message || "Unable to send event invite.");
+    }
   };
 
   const retryEventInvite = async (row: any) => {
+    if (selectedEventIsPast) return;
     const sendResult = await sendEventInviteEmail(row.invitee_email, selectedEvent.title, selectedEvent.starts_at, selectedEvent.location || "");
     if (!sendResult.ok) {
       await updateEventInviteStatus(row.id, "failed", null, sendResult.error || "Unable to send email", null);
@@ -273,30 +294,43 @@ export default function EventsAppPage() {
   const sendMessage = async () => {
     if (!selectedEvent || (!body.trim() && !messageLinkUrl.trim() && !attachment)) return;
     try {
-      let mediaUrl: string | null = null, mediaType: string | null = null;
+      let mediaUrl: string | null = null;
+      let mediaType: string | null = null;
       if (attachment) {
         mediaUrl = await uploadPublicImage("chat-media", me, attachment);
         mediaType = attachment.type || "application/octet-stream";
       }
       await sendEventMessage(selectedEvent.id, me, body.trim(), replyTo, mediaUrl, mediaType, messageLinkUrl.trim() || null);
-      setBody(""); setMessageLinkUrl(""); setAttachment(null); setReplyTo(null);
+      setBody("");
+      setMessageLinkUrl("");
+      setAttachment(null);
+      setReplyTo(null);
       await openEvent(selectedEvent);
-    } catch (e: any) { setStatus(e.message || "Unable to send event message."); }
+    } catch (e: any) {
+      setStatus(e.message || "Unable to send event message.");
+    }
   };
 
   const saveEditMessage = async (messageId: string) => {
     try {
       await editEventMessageByAuthor(messageId, me, editingMessageBody);
-      setEditingMessageId(null); setEditingMessageBody("");
+      setEditingMessageId(null);
+      setEditingMessageBody("");
       await openEvent(selectedEvent);
       setStatus("Message updated.");
-    } catch (e: any) { setStatus(e.message || "Unable to edit event message."); }
+    } catch (e: any) {
+      setStatus(e.message || "Unable to edit event message.");
+    }
   };
 
   const react = async (messageId: string, emoji: string) => {
     if (!selectedEvent) return;
-    try { await reactToEventMessage(selectedEvent.id, messageId, me, emoji); await openEvent(selectedEvent); }
-    catch (e: any) { setStatus(e.message || "Unable to react."); }
+    try {
+      await reactToEventMessage(selectedEvent.id, messageId, me, emoji);
+      await openEvent(selectedEvent);
+    } catch (e: any) {
+      setStatus(e.message || "Unable to react.");
+    }
   };
 
   const addFriend = async (userId: string) => {
@@ -304,34 +338,55 @@ export default function EventsAppPage() {
       const result: any = await sendFriendRequest(me, userId);
       setStatus(result?.duplicate ? "Friend request already pending." : "Friend request sent.");
       if (!result?.duplicate) setFriendIds(new Set<string>([...Array.from(friendIds), userId]));
-    } catch (e: any) { setStatus(e.message || "Unable to send friend request."); }
+    } catch (e: any) {
+      setStatus(e.message || "Unable to send friend request.");
+    }
   };
 
   const uploadGallery = async () => {
     if (!selectedEvent || !galleryFile) return;
     try {
       await attachEventMedia(selectedEvent.id, me, galleryFile);
-      setGalleryFile(null); await openEvent(selectedEvent); setStatus("Event media uploaded.");
-    } catch (e: any) { setStatus(e.message || "Unable to upload event media."); }
+      setGalleryFile(null);
+      await openEvent(selectedEvent);
+      setStatus("Event media uploaded.");
+    } catch (e: any) {
+      setStatus(e.message || "Unable to upload event media.");
+    }
   };
 
   const checkIn = async () => {
     if (!selectedEvent) return;
     try {
       const result = await checkInToEventWithRewards({
-        eventId: selectedEvent.id, userId: me, eventName: selectedEvent.title, eventDate: selectedEventDateLabel, file: checkInFile,
+        eventId: selectedEvent.id,
+        userId: me,
+        eventName: selectedEvent.title,
+        eventDate: selectedEventDateLabel,
+        file: checkInFile,
       });
-      setCheckInFile(null); await openEvent(selectedEvent);
+      setCheckInFile(null);
+      await openEvent(selectedEvent);
       setStatus(result.reward > 0 ? `Checked in. Earned ${result.reward} karma.` : "Checked in. Daily karma cap reached.");
-    } catch (e: any) { setStatus(e.message || "Unable to check in."); }
+    } catch (e: any) {
+      setStatus(e.message || "Unable to check in.");
+    }
   };
 
   const awardBadge = async () => {
     if (!selectedEvent || !awardUserId.trim() || !canReview) return;
     try {
-      await awardEventBadgeToUser({ userId: awardUserId.trim(), eventName: selectedEvent.title, eventDate: selectedEventDateLabel, awardedBy: me });
-      setAwardUserId(""); setStatus("Event badge awarded.");
-    } catch (e: any) { setStatus(e.message || "Unable to award event badge."); }
+      await awardEventBadgeToUser({
+        userId: awardUserId.trim(),
+        eventName: selectedEvent.title,
+        eventDate: selectedEventDateLabel,
+        awardedBy: me,
+      });
+      setAwardUserId("");
+      setStatus("Event badge awarded.");
+    } catch (e: any) {
+      setStatus(e.message || "Unable to award event badge.");
+    }
   };
 
   const renderEventList = (rows: any[], emptyText: string) =>
@@ -350,9 +405,7 @@ export default function EventsAppPage() {
     <ClientShell>
       <section className="hero">
         <h1 style={{ margin: 0, fontSize: 30 }}>Events</h1>
-        <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
-          Upcoming events are shown first, then create a new event, then review past events. Open any event to view and upload event media.
-        </p>
+        <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>Upcoming events are shown first, then create a new event, then review past events. Open any event to view and upload event media.</p>
       </section>
 
       <div className="grid">
@@ -389,12 +442,9 @@ export default function EventsAppPage() {
               <div style={{ opacity: 0.75 }}>Karma available: {karmaPoints}</div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 <button className="button" onClick={createOrUpdate} disabled={!me || !title || !startsAt}>{editingEvent ? "Save event" : "Create event"}</button>
-                {editingEvent ? <button className="button secondary" onClick={() => { setEditingEvent(false); setSelectedEvent(null); setTitle(""); setDescription(""); setStartsAt(""); setLocation(""); setLinkUrl(""); setIsPublic(true); setCoverFile(null); }}>Cancel edit</button> : null}
               </div>
             </div>
-          ) : (
-            <EmptyState title="Need 1 karma point" body="Creating an event costs 1 karma point. You can still view your existing events below." />
-          )}
+          ) : <EmptyState title="Need 1 karma point" body="Creating an event costs 1 karma point. You can still view your existing events below." />}
         </section>
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
@@ -405,7 +455,8 @@ export default function EventsAppPage() {
         {selectedEvent ? (
           <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
             <h3 style={{ marginTop: 0 }}>{selectedEvent.title}</h3>
-            {selectedEvent.cover_image_url ? <img src={selectedEvent.cover_image_url} alt={selectedEvent.title} style={{ width: "100%", maxWidth: 420, borderRadius: 18, border: "1px solid #ead5df", marginBottom: 12 }} /> : null}
+            {selectedEvent.created_by === me ? <button className="button secondary" onClick={deleteEvent}>Delete this event</button> : null}
+            {selectedEvent.cover_image_url ? <img src={selectedEvent.cover_image_url} alt={selectedEvent.title} style={{ width: "100%", maxWidth: 420, borderRadius: 18, border: "1px solid #ead5df", marginBottom: 12, marginTop: 12 }} /> : null}
             {selectedEvent.description ? <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{selectedEvent.description}</p> : null}
             {selectedEvent.link_url ? <p><a href={selectedEvent.link_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>{selectedEvent.link_url}</a></p> : null}
             <p style={{ opacity: 0.8 }}>{selectedEvent.starts_at} • {selectedEvent.location || "Location TBD"}</p>
@@ -437,7 +488,7 @@ export default function EventsAppPage() {
                 <p style={{ opacity: 0.75, marginTop: 8 }}>Daily event karma is capped to reduce abuse.</p>
               </div>
 
-              {selectedEvent.created_by === me ? (
+              {!selectedEventIsPast && selectedEvent.created_by === me ? (
                 <div>
                   <h4 style={{ marginTop: 0 }}>Invite people</h4>
                   <div style={{ display: "grid", gap: 12 }}>
@@ -474,12 +525,7 @@ export default function EventsAppPage() {
                 <h3 style={{ marginTop: 0 }}>Event thread</h3>
                 <div style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, minHeight: 180, background: "#fffafc" }}>
                   {eventMessages.length ? eventMessages.map((m: any) => (
-                    <EventMessageCard key={m.id} m={m} me={me} friendIds={friendIds} onAddFriend={addFriend} onReply={setReplyTo} onReact={react}
-                      onEditStart={(msg: any) => { setEditingMessageId(msg.id); setEditingMessageBody(msg.body || ""); }}
-                      isEditing={editingMessageId === m.id} editBody={editingMessageBody} setEditBody={setEditingMessageBody}
-                      onEditSave={saveEditMessage}
-                      onEditCancel={() => { setEditingMessageId(null); setEditingMessageBody(""); }}
-                    />
+                    <EventMessageCard key={m.id} m={m} me={me} friendIds={friendIds} onAddFriend={addFriend} onReply={setReplyTo} onReact={react} onEditStart={(msg: any) => { setEditingMessageId(msg.id); setEditingMessageBody(msg.body || ""); }} isEditing={editingMessageId === m.id} editBody={editingMessageBody} setEditBody={setEditingMessageBody} onEditSave={saveEditMessage} onEditCancel={() => { setEditingMessageId(null); setEditingMessageBody(""); }} />
                   )) : <p style={{ margin: 0, opacity: 0.7 }}>No event messages yet.</p>}
                 </div>
                 <div style={{ display: "grid", gap: 12, marginTop: 12 }}>

@@ -37,6 +37,16 @@ async function sendFriendRequestEmailNotification(recipientUserId: string, reque
 const EMOJIS = ["❤️", "👍", "😂", "🔥", "👏"];
 const PAGE_SIZE = 10;
 
+const compactBtn: React.CSSProperties = {
+  padding: "6px 8px",
+  borderRadius: 10,
+  border: "1px solid #f1dfe8",
+  background: "#fff",
+  fontSize: 12,
+  lineHeight: 1.1,
+  cursor: "pointer",
+};
+
 function formatKarma(value: any) {
   const num = Number(value || 0);
   return Number.isInteger(num) ? String(num) : num.toFixed(1).replace(/\.0$/, "");
@@ -117,9 +127,9 @@ function MessageCard({
             </>
           )}
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-            <button type="button" className="button secondary" onClick={() => onReplyStart(String(m.id))}>Reply</button>
-            {EMOJIS.map((emoji) => <button key={emoji} className="button secondary" onClick={() => onReact(m.id, emoji)}>{emoji} {grouped.get(emoji) || ""}</button>)}
+          <div style={{ display: "flex", gap: 6, flexWrap: "nowrap", marginTop: 8, overflowX: "auto" }}>
+            <button type="button" style={compactBtn} onClick={() => onReplyStart(String(m.id))}>Reply</button>
+            {EMOJIS.map((emoji) => <button key={emoji} style={compactBtn} onClick={() => onReact(m.id, emoji)}>{emoji} {grouped.get(emoji) || ""}</button>)}
           </div>
 
           {isOpen ? (

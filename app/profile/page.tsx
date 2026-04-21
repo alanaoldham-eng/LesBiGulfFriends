@@ -50,6 +50,7 @@ export default function ProfilePage() {
     email_friend_requests: false,
     email_private_messages: false,
     email_breakfast_reminders: false,
+    email_event_invites: false,
   });
   const canAddMorePhotos = photoUrls.length < 3;
 
@@ -80,6 +81,7 @@ export default function ProfilePage() {
               email_friend_requests: false,
               email_private_messages: false,
               email_breakfast_reminders: false,
+              email_event_invites: false,
             })),
           ]);
 
@@ -90,6 +92,7 @@ export default function ProfilePage() {
             email_friend_requests: Boolean(notif?.email_friend_requests),
             email_private_messages: Boolean(notif?.email_private_messages),
             email_breakfast_reminders: Boolean(notif?.email_breakfast_reminders),
+            email_event_invites: Boolean((notif as any)?.email_event_invites),
           });
           setStatus("");
         } catch {
@@ -121,6 +124,7 @@ export default function ProfilePage() {
         email_friend_requests: notificationSettings.email_friend_requests,
         email_private_messages: notificationSettings.email_private_messages,
         email_breakfast_reminders: notificationSettings.email_breakfast_reminders,
+        email_event_invites: notificationSettings.email_event_invites,
       });
 
       localStorage.setItem("lbgf_profile_started", "1");
@@ -243,6 +247,10 @@ export default function ProfilePage() {
                 <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
                   <input type="checkbox" checked={notificationSettings.email_breakfast_reminders} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_breakfast_reminders: e.target.checked }))} />
                   <span>Email me a Breakfast of Champions reminder</span>
+                </label>
+                <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <input type="checkbox" checked={notificationSettings.email_event_invites} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_event_invites: e.target.checked }))} />
+                  <span>Email me about public and private event invites</span>
                 </label>
               </div>
 

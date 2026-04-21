@@ -1,10 +1,11 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ClientShell } from "../../components/ClientShell";
 import { getCurrentUser } from "../../lib/auth";
 import { listProfilesForAdmin, rewardUserKarma, grantBadge } from "../../lib/db";
+import { supabase } from "../../lib/supabase/client";
 
 const ADMIN_EMAIL = "alanaoldham@gmail.com";
 
@@ -16,24 +17,36 @@ export default function AdminRewardsPage() {
   const [note, setNote] = useState("Helpful community member");
   const [status, setStatus] = useState("");
   const [badgeUserId, setBadgeUserId] = useState("");
-  const [badgeLabel, setBadgeLabel] = useState("OG");
-  const [badgeEmoji, setBadgeEmoji] = useState("👑");
-  const [badgeKey, setBadgeKey] = useState("og");
-  const [badgeElectionKey, setBadgeElectionKey] = useState("");
+  const [badgeSelection, setBadgeSelection] = useState("og");
+  const [eventBadgeOptions, setEventBadgeOptions] = useState<any[]>([]);
 
   useEffect(() => {
     const run = async () => {
-      const user = await getCurrentUser();
-      if (!user) return;
-      const email = user.email?.toLowerCase() || "";
-      if (email === ADMIN_EMAIL) {
-        setAllowed(true);
-        const rows = await listProfilesForAdmin().catch(() => []);
-        setProfiles(rows);
-      }
+      const user = await getCurrentUser().catch(() => null);
+      const email = user?.email?.toLowerCase() || "";
+      if (email !== ADMIN_EMAIL) return;
+      setAllowed(true);
+
+      const [rows, eventsRes] = await Promise.all([
+        listProfilesForAdmin().catch(() => []),
+        supabase.from("events").select("id, title, starts_at").order("starts_at", { ascending: false }).limit(100),
+      ]);
+      setProfiles(rows);
+      setEventBadgeOptions((eventsRes.data || []).map((ev: any) => ({
+        value: `event:${ev.id}`,
+        label: `${ev.title} (${new Date(ev.starts_at).toLocaleDateString()})`,
+        badgeKey: "event_attended",
+        badgeLabel: `Attended ${ev.title} • ${new Date(ev.starts_at).toLocaleDateString()}`,
+        badgeEmoji: "😊",
+      })));
     };
     run();
   }, []);
+
+  const badgeOptions = useMemo(() => ([
+    { value: "og", label: "OG badge", badgeKey: "og", badgeLabel: "OG", badgeEmoji: "👑" },
+    ...eventBadgeOptions,
+  ]), [eventBadgeOptions]);
 
   const reward = async () => {
     try {
@@ -46,7 +59,9 @@ export default function AdminRewardsPage() {
 
   const giveBadge = async () => {
     try {
-      await grantBadge(badgeUserId, badgeKey, badgeLabel, badgeEmoji, badgeElectionKey || null);
+      const selected = badgeOptions.find((b) => b.value === badgeSelection);
+      if (!selected) throw new Error("Select a badge first.");
+      await grantBadge(badgeUserId, selected.badgeKey, selected.badgeLabel, selected.badgeEmoji, null);
       setStatus("Badge granted.");
     } catch (e: any) {
       setStatus(e.message || "Unable to grant badge.");
@@ -56,10 +71,8 @@ export default function AdminRewardsPage() {
   return (
     <ClientShell>
       <section className="hero">
-        <h1 style={{ margin: 0, fontSize: 30 }}>Admin karma rewards</h1>
-        <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
-          Manually reward helpful members.
-        </p>
+        <h1 style={{ margin: 0, fontSize: 30 }}>Admin Magic Wand</h1>
+        <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>Manually reward helpful members and grant badges.</p>
       </section>
 
       {!allowed ? (
@@ -69,56 +82,30 @@ export default function AdminRewardsPage() {
       ) : (
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <div style={{ display: "grid", gap: 12 }}>
-            <select
-              id="reward-user-id"
-              name="rewardUserId"
-              value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value)}
-              style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, background: "#fff" }}
-            >
+            <select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, background: "#fff" }}>
               <option value="">Select member</option>
-              {profiles.map((profile) => (
-                <option key={profile.id} value={profile.id}>{profile.display_name || profile.id}</option>
-              ))}
+              {profiles.map((profile: any) => <option key={profile.id} value={profile.id}>{profile.display_name || profile.id}</option>)}
             </select>
-            <input
-              id="reward-amount"
-              name="rewardAmount"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Amount"
-              style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
-            />
-            <textarea
-              id="reward-note"
-              name="rewardNote"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Reason"
-              style={{ minHeight: 120, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
-            />
-            <button className="button" onClick={reward} disabled={!selectedUserId || !amount || !note.trim()}>
-              Grant karma
-            </button>
-            {status ? <p style={{ margin: 0, opacity: 0.8 }}>{status}</p> : null}
+            <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Reason" style={{ minHeight: 120, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+            <button className="button" onClick={reward} disabled={!selectedUserId || !amount || !note.trim()}>Grant karma</button>
           </div>
-                  <div style={{ height: 16 }} />
+
+          <div style={{ height: 16 }} />
           <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
             <h3 style={{ marginTop: 0 }}>Grant badge</h3>
             <div style={{ display: "grid", gap: 12 }}>
-              <select id="badge-user-id" name="badgeUserId" value={badgeUserId} onChange={(e) => setBadgeUserId(e.target.value)} style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, background: "#fff" }}>
+              <select value={badgeUserId} onChange={(e) => setBadgeUserId(e.target.value)} style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, background: "#fff" }}>
                 <option value="">Select member</option>
-                {profiles.map((profile) => (
-                  <option key={profile.id} value={profile.id}>{profile.display_name || profile.id}</option>
-                ))}
+                {profiles.map((profile: any) => <option key={profile.id} value={profile.id}>{profile.display_name || profile.id}</option>)}
               </select>
-              <input id="badge-key" name="badgeKey" value={badgeKey} onChange={(e) => setBadgeKey(e.target.value)} placeholder="Badge key" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-              <input id="badge-label" name="badgeLabel" value={badgeLabel} onChange={(e) => setBadgeLabel(e.target.value)} placeholder="Badge label" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-              <input id="badge-emoji" name="badgeEmoji" value={badgeEmoji} onChange={(e) => setBadgeEmoji(e.target.value)} placeholder="Badge emoji" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-              <input id="badge-election-key" name="badgeElectionKey" value={badgeElectionKey} onChange={(e) => setBadgeElectionKey(e.target.value)} placeholder="Election key (optional)" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-              <button className="button" onClick={giveBadge} disabled={!badgeUserId || !badgeKey || !badgeLabel || !badgeEmoji}>Grant badge</button>
+              <select value={badgeSelection} onChange={(e) => setBadgeSelection(e.target.value)} style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, background: "#fff" }}>
+                {badgeOptions.map((badge: any) => <option key={badge.value} value={badge.value}>{badge.label}</option>)}
+              </select>
+              <button className="button" onClick={giveBadge} disabled={!badgeUserId || !badgeSelection}>Grant badge</button>
             </div>
           </section>
+          {status ? <p style={{ marginTop: 12, opacity: 0.8 }}>{status}</p> : null}
         </section>
       )}
     </ClientShell>
