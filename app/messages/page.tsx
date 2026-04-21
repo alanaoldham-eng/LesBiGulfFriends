@@ -1,7 +1,7 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ClientShell } from "../../components/ClientShell";
 import { EmptyState } from "../../components/EmptyState";
@@ -46,7 +46,7 @@ function MessageAttachment({ m, senderName }: { m: any; senderName: string }) {
   );
 }
 
-export default function MessagesPage() {
+function MessagesPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const threadId = searchParams?.get("thread") || "";
@@ -160,5 +160,20 @@ export default function MessagesPage() {
         {status ? <p style={{ margin: 0, opacity: 0.8 }}>{status}</p> : null}
       </div>
     </ClientShell>
+  );
+}
+
+export default function MessagesPage() {
+  return (
+    <Suspense fallback={
+      <ClientShell>
+        <section className="hero">
+          <h1 style={{ margin: 0, fontSize: 30 }}>Messages</h1>
+          <p style={{ opacity: 0.8 }}>Loading messages…</p>
+        </section>
+      </ClientShell>
+    }>
+      <MessagesPageInner />
+    </Suspense>
   );
 }
