@@ -18,7 +18,6 @@ import {
   getFriendIds,
   sendFriendRequest,
   listFriends,
-  getProfileById,
 } from "../../lib/db";
 import {
   attachEventMedia,
@@ -31,10 +30,24 @@ import {
 import { editEventMessageByAuthor } from "../../lib/messageEditing";
 import { getViewerRoleFlags } from "../../lib/roadmap";
 import { deleteEventByOwner } from "../../lib/eventCrud";
+import { supabase } from "../../lib/supabase/client";
 
 const EMOJIS = ["❤️", "👍", "😂", "🔥", "👏"];
 
-function EventMessageCard({ m, me, friendIds, onAddFriend, onReply, onReact, onEditStart, isEditing, editBody, setEditBody, onEditSave, onEditCancel }: any) {
+function EventMessageCard({
+  m,
+  me,
+  friendIds,
+  onAddFriend,
+  onReply,
+  onReact,
+  onEditStart,
+  isEditing,
+  editBody,
+  setEditBody,
+  onEditSave,
+  onEditCancel,
+}: any) {
   const mainPhoto = m.profile?.photo_urls?.[0] || m.profile?.photo_url || null;
   const isFriend = friendIds.has(m.sender_id);
   const grouped = new Map<string, number>();
@@ -43,10 +56,14 @@ function EventMessageCard({ m, me, friendIds, onAddFriend, onReply, onReact, onE
   return (
     <div style={{ marginBottom: 14, paddingLeft: m.parent_message_id ? 20 : 0, borderLeft: m.parent_message_id ? "3px solid #f1dfe8" : "none" }}>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-        {mainPhoto ? <img src={mainPhoto} alt={m.profile?.display_name || "Member"} style={{ width: 38, height: 38, borderRadius: 999, objectFit: "cover", border: "1px solid #ead5df" }} /> : null}
+        {mainPhoto ? (
+          <img src={mainPhoto} alt={m.profile?.display_name || "Member"} style={{ width: 38, height: 38, borderRadius: 999, objectFit: "cover", border: "1px solid #ead5df" }} />
+        ) : null}
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <Link href={`/members/${m.sender_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>{m.sender_id === me ? "You" : (m.profile?.display_name || m.sender_id)}</Link>
+            <Link href={`/members/${m.sender_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>
+              {m.sender_id === me ? "You" : m.profile?.display_name || m.sender_id}
+            </Link>
             {m.sender_id !== me && !isFriend ? <button className="button secondary" onClick={() => onAddFriend(m.sender_id)}>Add Friend</button> : null}
             {m.parent_message_id ? <span style={{ opacity: 0.6, fontSize: 12 }}>Reply</span> : null}
             {m.sender_id === me ? <button className="button secondary" onClick={() => onEditStart(m)}>Edit</button> : null}
@@ -65,7 +82,17 @@ function EventMessageCard({ m, me, friendIds, onAddFriend, onReply, onReact, onE
             <>
               {m.body ? <div style={{ marginTop: 4, whiteSpace: "pre-wrap" }}>{m.body}</div> : null}
               {m.link_url ? <div style={{ marginTop: 6 }}><a href={m.link_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>{m.link_url}</a></div> : null}
-              {m.media_url ? <div style={{ marginTop: 8 }}>{String(m.media_type || "").startsWith("image/") ? <img src={m.media_url} alt="Attachment" style={{ maxWidth: "100%", borderRadius: 14, border: "1px solid #ead5df" }} /> : <a href={m.media_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>Open attachment</a>}</div> : null}
+              {m.media_url ? (
+                <div style={{ marginTop: 8 }}>
+                  {String(m.media_type || "").startsWith("image/") ? (
+                    <img src={m.media_url} alt="Attachment" style={{ maxWidth: "100%", borderRadius: 14, border: "1px solid #ead5df" }} />
+                  ) : (
+                    <a href={m.media_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>
+                      Open attachment
+                    </a>
+                  )}
+                </div>
+              ) : null}
             </>
           )}
 
@@ -129,9 +156,9 @@ export default function EventsAppPage() {
     ]);
     setEvents(rows);
     setDisplayName(profile?.display_name || "A member");
+    setKarmaPoints(Number(profile?.karma_points || 0));
     setFriendIds(fids);
     setFriends(friendRows || []);
-    setKarmaPoints(Number(profile?.karma_points || 0));
     setCanReview(!!roleFlags?.canReview);
   };
 
@@ -145,13 +172,9 @@ export default function EventsAppPage() {
     run();
   }, []);
 
-  const buildAwardOptions = async (ev: any, invs: any[]) => {
-    const ids = Array.from(new Set([ev.created_by, ...(invs || []).map((x: any) => x.invitee_user_id).filter(Boolean)]));
-    const profiles = await Promise.all(ids.map(async (id: string) => {
-      const p = await getProfileById(id).catch(() => null);
-      return p ? { id: p.id, label: p.display_name || p.id } : { id, label: id };
-    }));
-    setAwardOptions(profiles);
+  const buildAwardOptions = async () => {
+    const { data: profiles } = await supabase.from("profiles").select("id, display_name").order("display_name", { ascending: true }).limit(500);
+    setAwardOptions((profiles || []).map((p: any) => ({ id: p.id, label: p.display_name || p.id })));
   };
 
   const openEvent = async (ev: any) => {
@@ -168,11 +191,11 @@ export default function EventsAppPage() {
       listEventInvites(ev.id).catch(() => []),
       listEventMessagesDetailed(ev.id).catch(() => []),
       listEventMedia(ev.id).catch(() => []),
+      buildAwardOptions(),
     ]);
     setEventInvites(invs);
     setEventMessages(msgs);
     setEventMedia(media);
-    await buildAwardOptions(ev, invs);
   };
 
   const createOrUpdate = async () => {
@@ -241,14 +264,15 @@ export default function EventsAppPage() {
     }
   };
 
-  const deleteEvent = async () => {
-    if (!selectedEvent?.id || selectedEvent.created_by !== me) return;
+  const deleteEvent = async (eventId: string) => {
     try {
-      await deleteEventByOwner(selectedEvent.id, me);
-      setSelectedEvent(null);
-      setEventInvites([]);
-      setEventMessages([]);
-      setEventMedia([]);
+      await deleteEventByOwner(eventId, me);
+      if (selectedEvent?.id === eventId) {
+        setSelectedEvent(null);
+        setEventInvites([]);
+        setEventMessages([]);
+        setEventMedia([]);
+      }
       await refreshEvents(me);
       setStatus("Event deleted.");
     } catch (e: any) {
@@ -389,7 +413,7 @@ export default function EventsAppPage() {
     }
   };
 
-  const renderEventList = (rows: any[], emptyText: string) =>
+  const renderEventList = (rows: any[], emptyText: string, allowDelete: boolean) =>
     rows.length ? rows.map((ev: any) => (
       <div key={ev.id} style={{ borderBottom: "1px solid #f1dfe8", padding: "10px 0" }}>
         <strong>{ev.title}</strong>
@@ -397,6 +421,7 @@ export default function EventsAppPage() {
         <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className="button secondary" onClick={() => openEvent(ev)}>Open event</button>
           {ev.created_by === me ? <button className="button secondary" onClick={() => { openEvent(ev); setEditingEvent(true); }}>Edit event</button> : null}
+          {allowDelete && ev.created_by === me ? <button className="button secondary" onClick={() => deleteEvent(ev.id)}>Delete event</button> : null}
         </div>
       </div>
     )) : <p style={{ margin: 0, opacity: 0.8 }}>{emptyText}</p>;
@@ -405,13 +430,15 @@ export default function EventsAppPage() {
     <ClientShell>
       <section className="hero">
         <h1 style={{ margin: 0, fontSize: 30 }}>Events</h1>
-        <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>Upcoming events are shown first, then create a new event, then review past events. Open any event to view and upload event media.</p>
+        <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
+          Upcoming events are shown first, then create a new event, then review past events. Open any event to view and upload event media.
+        </p>
       </section>
 
       <div className="grid">
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <h3 style={{ marginTop: 0 }}>Upcoming Events</h3>
-          {renderEventList(upcomingEvents, "No upcoming events yet.")}
+          {renderEventList(upcomingEvents, "No upcoming events yet.", true)}
         </section>
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
@@ -441,22 +468,25 @@ export default function EventsAppPage() {
               <input type="file" accept="image/*" onChange={(e) => setCoverFile(e.target.files?.[0] || null)} />
               <div style={{ opacity: 0.75 }}>Karma available: {karmaPoints}</div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button className="button" onClick={createOrUpdate} disabled={!me || !title || !startsAt}>{editingEvent ? "Save event" : "Create event"}</button>
+                <button className="button" onClick={createOrUpdate} disabled={!me || !title || !startsAt}>
+                  {editingEvent ? "Save event" : "Create event"}
+                </button>
               </div>
             </div>
-          ) : <EmptyState title="Need 1 karma point" body="Creating an event costs 1 karma point. You can still view your existing events below." />}
+          ) : (
+            <EmptyState title="Need 1 karma point" body="Creating an event costs 1 karma point. You can still view your existing events below." />
+          )}
         </section>
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <h3 style={{ marginTop: 0 }}>Past Events</h3>
-          {renderEventList(pastEvents, "No past events yet.")}
+          {renderEventList(pastEvents, "No past events yet.", false)}
         </section>
 
         {selectedEvent ? (
           <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
             <h3 style={{ marginTop: 0 }}>{selectedEvent.title}</h3>
-            {selectedEvent.created_by === me ? <button className="button secondary" onClick={deleteEvent}>Delete this event</button> : null}
-            {selectedEvent.cover_image_url ? <img src={selectedEvent.cover_image_url} alt={selectedEvent.title} style={{ width: "100%", maxWidth: 420, borderRadius: 18, border: "1px solid #ead5df", marginBottom: 12, marginTop: 12 }} /> : null}
+            {selectedEvent.cover_image_url ? <img src={selectedEvent.cover_image_url} alt={selectedEvent.title} style={{ width: "100%", maxWidth: 420, borderRadius: 18, border: "1px solid #ead5df", marginBottom: 12 }} /> : null}
             {selectedEvent.description ? <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{selectedEvent.description}</p> : null}
             {selectedEvent.link_url ? <p><a href={selectedEvent.link_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>{selectedEvent.link_url}</a></p> : null}
             <p style={{ opacity: 0.8 }}>{selectedEvent.starts_at} • {selectedEvent.location || "Location TBD"}</p>
