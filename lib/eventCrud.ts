@@ -17,7 +17,7 @@ export function canEditPastEventMistake(eventRow: any) {
 export async function deleteEventByOwner(eventId: string, ownerId: string) {
   const { data: existing, error: readError } = await supabase
     .from("events")
-    .select("id, created_by, created_at, starts_at")
+    .select("id, created_by")
     .eq("id", eventId)
     .maybeSingle();
 
@@ -26,23 +26,11 @@ export async function deleteEventByOwner(eventId: string, ownerId: string) {
     throw new Error("Event not found or not owned by you.");
   }
 
-  // only allow delete for upcoming events or same-day mistake events
-  const startsAt = existing.starts_at ? new Date(existing.starts_at).getTime() : 0;
-  const isPast = startsAt < Date.now();
-  const createdToday = sameUtcDate(existing.created_at, new Date());
-  if (isPast && !createdToday) {
-    throw new Error("Past events can only be deleted on the day they were created.");
-  }
-
-  const { data: deleted, error } = await supabase
-    .from("events")
-    .delete()
-    .eq("id", eventId)
-    .eq("created_by", ownerId)
-    .select("id");
+  const { data, error } = await supabase.rpc("delete_owned_event_rpc", {
+    _event_id: eventId,
+  });
 
   if (error) throw error;
-  if (!deleted || !deleted.length) {
-    throw new Error("Event was not deleted.");
-  }
+  if (!data?.deleted) throw new Error("Event was not deleted.");
+  return data;
 }

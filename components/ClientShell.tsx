@@ -39,6 +39,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState("");
   const [notifications, setNotifications] = useState<any[]>([]);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
@@ -47,6 +48,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       const email = user?.email?.toLowerCase() || "";
       setIsAdmin(email === ADMIN_EMAIL);
       setIsLoggedIn(Boolean(user?.id));
+      setCurrentUserId(user?.id || "");
       if (user?.id) {
         listInAppNotifications(user.id).then(setNotifications).catch(() => setNotifications([]));
       } else {
@@ -73,15 +75,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       <div ref={wrapRef} style={{ marginBottom: 18, position: "relative" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
           <div style={{ position: "relative" }}>
-            <button
-              className="button secondary"
-              onClick={() => {
-                setMenuOpen((v) => !v);
-                setNotifOpen(false);
-                setProfileOpen(false);
-              }}
-              aria-label="Open menu"
-            >
+            <button className="button secondary" onClick={() => { setMenuOpen((v) => !v); setNotifOpen(false); setProfileOpen(false); }} aria-label="Open menu">
               ☰
             </button>
 
@@ -107,16 +101,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             {isLoggedIn ? (
               <>
                 <div style={{ position: "relative" }}>
-                  <button
-                    className="button secondary"
-                    onClick={() => {
-                      setNotifOpen((v) => !v);
-                      setMenuOpen(false);
-                      setProfileOpen(false);
-                    }}
-                    aria-label="Open notifications"
-                    style={{ position: "relative" }}
-                  >
+                  <button className="button secondary" onClick={() => { setNotifOpen((v) => !v); setMenuOpen(false); setProfileOpen(false); }} aria-label="Open notifications" style={{ position: "relative" }}>
                     🔔
                     {notifications.length ? (
                       <span style={{ position: "absolute", top: -6, right: -6, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999, background: "#8d2d5d", color: "#fff", fontSize: 11, fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>
@@ -130,12 +115,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                       {notifications.length ? (
                         <div style={{ display: "grid", gap: 10 }}>
                           {notifications.map((n: any) => (
-                            <Link
-                              key={n.id}
-                              href={n.href}
-                              onClick={() => setNotifOpen(false)}
-                              style={{ display: "block", padding: 12, borderRadius: 14, border: "1px solid #f1dfe8", background: "#fff8fb", textDecoration: "none", color: "inherit" }}
-                            >
+                            <Link key={n.id} href={n.href} onClick={() => setNotifOpen(false)} style={{ display: "block", padding: 12, borderRadius: 14, border: "1px solid #f1dfe8", background: "#fff8fb", textDecoration: "none", color: "inherit" }}>
                               <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                                 <div style={{ width: 10, height: 10, borderRadius: 999, background: "#8d2d5d", marginTop: 5, flex: "0 0 auto" }} />
                                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -155,7 +135,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                   <button className="button secondary" onClick={() => { setProfileOpen((v) => !v); setMenuOpen(false); setNotifOpen(false); }} aria-label="Open profile menu">👤</button>
                   {profileOpen ? (
                     <div style={{ ...panelStyle, right: 0, minWidth: 220, display: "grid", gap: 8 }}>
-                      <Link href="/profile" style={menuItemStyle}>View Profile</Link>
+                      <Link href={currentUserId ? `/members/${currentUserId}` : "/profile"} style={menuItemStyle}>View Profile</Link>
                       <Link href="/profile" style={menuItemStyle}>Edit Profile</Link>
                       <Link href="/forgot-password" style={menuItemStyle}>Change Password</Link>
                       <button style={menuItemStyle} onClick={() => signOutEverywhere()}>Logout</button>

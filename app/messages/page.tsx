@@ -28,7 +28,7 @@ function MessageAttachment({ m, senderName }: { m: any; senderName: string }) {
       {m.media_url ? (
         <div style={{ marginTop: 8 }}>
           {String(m.media_type || "").startsWith("image/") ? (
-            <img src={m.media_url} alt="Attachment" style={{ maxWidth: "100%", borderRadius: 14, border: "1px solid #ead5df" }} />
+            <img src={m.media_url} loading="lazy" alt="Attachment" style={{ maxWidth: "100%", borderRadius: 14, border: "1px solid #ead5df" }} />
           ) : (
             <a href={m.media_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>Open attachment</a>
           )}
@@ -67,7 +67,7 @@ function MessagesPageInner() {
   };
 
   useEffect(() => {
-    const run = async () => {
+    (async () => {
       const user = await getCurrentUser().catch(() => null);
       if (!user) return;
       setMe(user.id);
@@ -77,23 +77,19 @@ function MessagesPageInner() {
       ]);
       setFriends(frs);
       setMyName(myProfile?.display_name || "A member");
-    };
-    run();
+    })();
   }, []);
 
   useEffect(() => {
-    const run = async () => {
+    (async () => {
       if (!me || !threadId) return;
       let friend = friendsById.get(threadId);
       if (!friend) {
         const profile = await getProfileById(threadId).catch(() => null);
         if (profile) friend = { id: profile.id, display_name: profile.display_name || "Member" };
       }
-      if (friend) {
-        await openThread(friend, Boolean(notificationId));
-      }
-    };
-    run();
+      if (friend) await openThread(friend, Boolean(notificationId));
+    })();
   }, [me, threadId, notificationId, friendsById]);
 
   const send = async () => {
@@ -127,16 +123,6 @@ function MessagesPageInner() {
       </section>
 
       <div className="grid">
-        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
-          <h3 style={{ marginTop: 0 }}>Friends</h3>
-          {friends.length ? friends.map((f: any) => (
-            <div key={f.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <span>{f.display_name}</span>
-              <button className="button secondary" onClick={() => openThread(f)}>Open thread</button>
-            </div>
-          )) : <EmptyState title="No DM threads yet" body="Add friends first, then come back here to chat." />}
-        </section>
-
         {selected ? (
           <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
             <h3 style={{ marginTop: 0 }}>Chat with {selected.display_name}</h3>
@@ -151,6 +137,16 @@ function MessagesPageInner() {
             </div>
           </section>
         ) : null}
+
+        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
+          <h3 style={{ marginTop: 0 }}>Friends</h3>
+          {friends.length ? friends.map((f: any) => (
+            <div key={f.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <span>{f.display_name}</span>
+              <button className="button secondary" onClick={() => openThread(f)}>Open thread</button>
+            </div>
+          )) : <EmptyState title="No DM threads yet" body="Add friends first, then come back here to chat." />}
+        </section>
 
         {status ? <p style={{ margin: 0, opacity: 0.8 }}>{status}</p> : null}
       </div>

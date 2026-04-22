@@ -494,6 +494,7 @@ export default function EventsAppPage() {
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <h3 style={{ marginTop: 0, marginBottom: 0 }}>{formMode === "edit" ? "Edit event" : "Create event"}</h3>
             {formMode === "closed" ? <button className="button" onClick={openCreate}>Create Event</button> : <button className="button secondary" onClick={() => { setFormMode("closed"); clearForm(); }}>Close</button>}
+           
           </div>
           {formMode !== "closed" ? (
             karmaPoints > 0 || formMode === "edit" ? (
