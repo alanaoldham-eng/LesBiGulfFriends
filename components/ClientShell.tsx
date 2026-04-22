@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { signOutEverywhere, getCurrentUser } from "../lib/auth";
 import { listInAppNotifications } from "../lib/notificationSettings";
+import { getViewerRoleFlags } from "../lib/roadmap";
 
 const ADMIN_EMAIL = "alanaoldham@gmail.com";
 
@@ -35,6 +36,7 @@ const menuItemStyle: React.CSSProperties = {
 
 export function ClientShell({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
+  const [canReview, setCanReview] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -44,15 +46,18 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    getCurrentUser().then((user) => {
+    getCurrentUser().then(async (user) => {
       const email = user?.email?.toLowerCase() || "";
       setIsAdmin(email === ADMIN_EMAIL);
       setIsLoggedIn(Boolean(user?.id));
       setCurrentUserId(user?.id || "");
       if (user?.id) {
         listInAppNotifications(user.id).then(setNotifications).catch(() => setNotifications([]));
+        const roleFlags = await getViewerRoleFlags(user.id).catch(() => ({ canReview: false }));
+        setCanReview(!!roleFlags?.canReview);
       } else {
         setNotifications([]);
+        setCanReview(false);
       }
     });
   }, []);
@@ -90,7 +95,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                 <Link href="/confessions" style={menuItemStyle}>Confessions</Link>
                 <Link href="/warning-wall" style={menuItemStyle}>The Warning Wall</Link>
                 <Link href="/availability" style={menuItemStyle}>Availability</Link>
-                <Link href="/proposals" style={menuItemStyle}>Proposals</Link>
+                {(canReview || isAdmin) ? <Link href="/proposals" style={menuItemStyle}>Proposals</Link> : null}
+                {(canReview || isAdmin) ? <Link href="/waiting-room" style={menuItemStyle}>Waiting Room</Link> : null}
                 <Link href="/feedback" style={menuItemStyle}>Bug / Feature</Link>
                 {isAdmin ? <Link href="/admin-rewards" style={menuItemStyle}>Admin Magic Wand</Link> : null}
               </div>
@@ -109,6 +115,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                       </span>
                     ) : null}
                   </button>
+
                   {notifOpen ? (
                     <div style={{ ...panelStyle, right: 0, width: 340, maxWidth: "calc(100vw - 24px)", maxHeight: 420, overflow: "auto" }}>
                       <div style={{ fontWeight: 700, marginBottom: 10 }}>Notifications</div>
@@ -116,13 +123,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                         <div style={{ display: "grid", gap: 10 }}>
                           {notifications.map((n: any) => (
                             <Link key={n.id} href={n.href} onClick={() => setNotifOpen(false)} style={{ display: "block", padding: 12, borderRadius: 14, border: "1px solid #f1dfe8", background: "#fff8fb", textDecoration: "none", color: "inherit" }}>
-                              <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                                <div style={{ width: 10, height: 10, borderRadius: 999, background: "#8d2d5d", marginTop: 5, flex: "0 0 auto" }} />
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontWeight: 600, lineHeight: 1.45 }}>{n.text}</div>
-                                  {n.created_at ? <div style={{ fontSize: 12, opacity: 0.65, marginTop: 6 }}>{new Date(n.created_at).toLocaleString()}</div> : null}
-                                </div>
-                              </div>
+                              <div style={{ fontWeight: 600, lineHeight: 1.45 }}>{n.text}</div>
+                              {n.created_at ? <div style={{ fontSize: 12, opacity: 0.65, marginTop: 6 }}>{new Date(n.created_at).toLocaleString()}</div> : null}
                             </Link>
                           ))}
                         </div>

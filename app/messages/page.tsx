@@ -6,39 +6,46 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { ClientShell } from "../../components/ClientShell";
 import { EmptyState } from "../../components/EmptyState";
 import { getCurrentUser } from "../../lib/auth";
-import { listFriends, listDmMessages, sendDm, uploadPublicImage, getMyProfile, getProfileById } from "../../lib/db";
+import { listFriends, getMyProfile, getProfileById } from "../../lib/db";
 import { markNotificationRead } from "../../lib/notificationSettings";
+import { supabase } from "../../lib/supabase/client";
 
-async function sendPrivateMessageEmailNotification(recipientUserId: string, senderName: string, snippet: string) {
-  try {
-    await fetch("/api/notifications/private-message", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ recipientUserId, senderName, snippet }),
-    });
-  } catch {}
+const PAGE_SIZE = 8;
+
+async function loadDmPage(me: string, otherId: string, before?: string | null) {
+  let q = supabase
+    .from("messages")
+    .select("id, sender_id, recipient_id, body, media_url, media_type, link_url, created_at")
+    .or(`and(sender_id.eq.${me},recipient_id.eq.${otherId}),and(sender_id.eq.${otherId},recipient_id.eq.${me})`)
+    .order("created_at", { ascending: false })
+    .limit(PAGE_SIZE);
+
+  if (before) q = q.lt("created_at", before);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
 }
 
-function MessageAttachment({ m, senderName }: { m: any; senderName: string }) {
+function MessageItem({ m, mine, onEdit, onDelete }: any) {
   return (
-    <div key={m.id} style={{ marginBottom: 12 }}>
-      <strong>{senderName}</strong>
-      {m.body ? <div style={{ opacity: 0.95, whiteSpace: "pre-wrap" }}>{m.body}</div> : null}
+    <div style={{ marginBottom: 12, borderBottom: "1px solid #f3e6ed", paddingBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+        <strong>{mine ? "You" : "Them"}</strong>
+        {mine ? (
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="button secondary" onClick={onEdit}>Edit</button>
+            <button className="button secondary" onClick={onDelete}>Delete</button>
+          </div>
+        ) : null}
+      </div>
+      {m.body ? <div style={{ whiteSpace: "pre-wrap" }}>{m.body}</div> : null}
       {m.link_url ? <div style={{ marginTop: 6 }}><a href={m.link_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>{m.link_url}</a></div> : null}
-      {m.media_url ? (
-        <div style={{ marginTop: 8 }}>
-          {String(m.media_type || "").startsWith("image/") ? (
-            <img src={m.media_url} loading="lazy" alt="Attachment" style={{ maxWidth: "100%", borderRadius: 14, border: "1px solid #ead5df" }} />
-          ) : (
-            <a href={m.media_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>Open attachment</a>
-          )}
-        </div>
-      ) : null}
+      <div style={{ marginTop: 6, fontSize: 12, opacity: 0.65 }}>{new Date(m.created_at).toLocaleString()}</div>
     </div>
   );
 }
 
-function MessagesPageInner() {
+function MessagesInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const threadId = searchParams?.get("thread") || "";
@@ -50,16 +57,18 @@ function MessagesPageInner() {
   const [messages, setMessages] = useState<any[]>([]);
   const [body, setBody] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
-  const [attachment, setAttachment] = useState<File | null>(null);
   const [status, setStatus] = useState("");
-  const [myName, setMyName] = useState("A member");
+  const [hasMore, setHasMore] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
 
   const friendsById = useMemo(() => new Map(friends.map((f: any) => [f.id, f])), [friends]);
 
   const openThread = async (friend: any, shouldMarkRead = false) => {
     setSelected(friend);
-    const msgs = await listDmMessages(me, friend.id).catch(() => []);
-    setMessages(msgs);
+    const firstPage = await loadDmPage(me, friend.id).catch(() => []);
+    setMessages(firstPage);
+    setHasMore(firstPage.length === PAGE_SIZE);
+
     if (shouldMarkRead && me && notificationId) {
       await markNotificationRead(me, notificationId).catch(() => null);
       router.replace(`/messages?thread=${encodeURIComponent(friend.id)}`);
@@ -71,12 +80,11 @@ function MessagesPageInner() {
       const user = await getCurrentUser().catch(() => null);
       if (!user) return;
       setMe(user.id);
-      const [frs, myProfile] = await Promise.all([
+      const [frs] = await Promise.all([
         listFriends(user.id).catch(() => []),
         getMyProfile(user.id).catch(() => null),
       ]);
       setFriends(frs);
-      setMyName(myProfile?.display_name || "A member");
     })();
   }, []);
 
@@ -92,26 +100,64 @@ function MessagesPageInner() {
     })();
   }, [me, threadId, notificationId, friendsById]);
 
-  const send = async () => {
-    if (!selected) return;
-    if (!body.trim() && !linkUrl.trim() && !attachment) return;
+  const loadMore = async () => {
+    if (!selected || !messages.length) return;
     try {
-      let mediaUrl: string | null = null;
-      let mediaType: string | null = null;
-      if (attachment) {
-        mediaUrl = await uploadPublicImage("chat-media", me, attachment);
-        mediaType = attachment.type || "application/octet-stream";
+      const older = await loadDmPage(me, selected.id, messages[messages.length - 1].created_at);
+      setMessages((prev) => [...prev, ...older]);
+      setHasMore(older.length === PAGE_SIZE);
+    } catch (e: any) {
+      setStatus(e.message || "Unable to load older messages.");
+    }
+  };
+
+  const saveOrSend = async () => {
+    if (!selected) return;
+    if (!body.trim() && !linkUrl.trim()) return;
+
+    try {
+      if (editingMessageId) {
+        const { error } = await supabase
+          .from("messages")
+          .update({ body: body.trim() || null, link_url: linkUrl.trim() || null })
+          .eq("id", editingMessageId)
+          .eq("sender_id", me);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("messages").insert({
+          sender_id: me,
+          recipient_id: selected.id,
+          body: body.trim() || null,
+          link_url: linkUrl.trim() || null,
+        });
+        if (error) throw error;
       }
-      const snippet = body.trim() || linkUrl.trim() || (attachment ? "Sent you an attachment" : "Sent you a message");
-      await sendDm(me, selected.id, body.trim(), mediaUrl, mediaType, linkUrl.trim() || null);
-      await sendPrivateMessageEmailNotification(selected.id, myName, snippet.slice(0, 120));
+
       setBody("");
       setLinkUrl("");
-      setAttachment(null);
-      const msgs = await listDmMessages(me, selected.id).catch(() => []);
-      setMessages(msgs);
+      setEditingMessageId(null);
+
+      const firstPage = await loadDmPage(me, selected.id).catch(() => []);
+      setMessages(firstPage);
+      setHasMore(firstPage.length === PAGE_SIZE);
     } catch (e: any) {
-      setStatus(e.message || "Unable to send message.");
+      setStatus(e.message || "Unable to save message.");
+    }
+  };
+
+  const beginEdit = (m: any) => {
+    setEditingMessageId(m.id);
+    setBody(m.body || "");
+    setLinkUrl(m.link_url || "");
+  };
+
+  const removeMessage = async (id: string) => {
+    try {
+      const { error } = await supabase.from("messages").delete().eq("id", id).eq("sender_id", me);
+      if (error) throw error;
+      setMessages((prev) => prev.filter((x: any) => x.id !== id));
+    } catch (e: any) {
+      setStatus(e.message || "Unable to delete message.");
     }
   };
 
@@ -119,21 +165,22 @@ function MessagesPageInner() {
     <ClientShell>
       <section className="hero">
         <h1 style={{ margin: 0, fontSize: 30 }}>Messages</h1>
-        <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>Only friends can DM each other. You can send text, links, and picture attachments.</p>
+        <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>Direct messages show newest first. Use Load more to reveal older messages.</p>
       </section>
 
       <div className="grid">
         {selected ? (
           <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
             <h3 style={{ marginTop: 0 }}>Chat with {selected.display_name}</h3>
-            <div style={{ display: "grid", gap: 10 }}>
-              <div style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, minHeight: 180, background: "#fffafc" }}>
-                {messages.length ? messages.map((m: any) => <MessageAttachment key={m.id} m={m} senderName={m.sender_id === me ? "You" : selected.display_name} />) : <p style={{ margin: 0, opacity: 0.7 }}>No messages yet.</p>}
-              </div>
+            <div style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, minHeight: 180, background: "#fffafc" }}>
+              {messages.length ? messages.map((m: any) => <MessageItem key={m.id} m={m} mine={m.sender_id === me} onEdit={() => beginEdit(m)} onDelete={() => removeMessage(m.id)} />) : <p style={{ margin: 0, opacity: 0.7 }}>No messages yet.</p>}
+              {hasMore ? <button className="button secondary" onClick={loadMore}>Load more</button> : null}
+            </div>
+
+            <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
               <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Type a message" style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
               <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="Optional link" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-              <input type="file" accept="image/*,.pdf,.doc,.docx,.txt,.zip" onChange={(e) => setAttachment(e.target.files?.[0] || null)} />
-              <button className="button" onClick={send}>Send message</button>
+              <button className="button" onClick={saveOrSend}>{editingMessageId ? "Save message" : "Send message"}</button>
             </div>
           </section>
         ) : null}
@@ -156,8 +203,8 @@ function MessagesPageInner() {
 
 export default function MessagesPage() {
   return (
-    <Suspense fallback={<ClientShell><section className="hero"><h1 style={{ margin: 0, fontSize: 30 }}>Messages</h1><p style={{ opacity: 0.8 }}>Loading messages…</p></section></ClientShell>}>
-      <MessagesPageInner />
+    <Suspense fallback={<ClientShell><section className="hero"><h1 style={{ margin: 0, fontSize: 30 }}>Messages</h1></section></ClientShell>}>
+      <MessagesInner />
     </Suspense>
   );
 }

@@ -3,55 +3,78 @@
 import { supabase } from "./supabase/client";
 
 export async function listEventMediaBundle(eventId: string) {
-  const [{ data: media, error: mediaError }, { data: comments, error: commentsError }, { data: reactions, error: reactionsError }] = await Promise.all([
-    supabase.from("event_media").select("*").eq("event_id", eventId).order("created_at", { ascending: false }),
-    supabase.from("event_media_comments").select("*").eq("event_id", eventId).order("created_at", { ascending: true }),
-    supabase.from("event_media_reactions").select("*").eq("event_id", eventId),
+  const { data: media, error } = await supabase
+    .from("event_media")
+    .select("*")
+    .eq("event_id", eventId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  const rows = media || [];
+  if (!rows.length) return [];
+
+  const mediaIds = rows.map((r: any) => r.id);
+  const ownerIds = [...new Set(rows.map((r: any) => r.user_id))];
+
+  const [{ data: comments }, { data: reactions }, { data: ownerProfiles }] = await Promise.all([
+    supabase.from("event_media_comments").select("*").in("media_id", mediaIds).order("created_at", { ascending: true }),
+    supabase.from("event_media_reactions").select("*").in("media_id", mediaIds),
+    ownerIds.length
+      ? supabase.from("profiles").select("id, display_name, photo_url, photo_urls").in("id", ownerIds)
+      : Promise.resolve({ data: [] as any[] }),
   ]);
-  if (mediaError) throw mediaError;
-  if (commentsError) throw commentsError;
-  if (reactionsError) throw reactionsError;
 
-  const userIds = Array.from(new Set([
-    ...(media || []).map((x: any) => x.user_id),
-    ...(comments || []).map((x: any) => x.user_id),
-    ...(reactions || []).map((x: any) => x.user_id),
-  ]));
+  const extraProfileIds = [...new Set([
+    ...(comments || []).map((c: any) => c.user_id),
+    ...(reactions || []).map((r: any) => r.user_id),
+  ])].filter((id) => !ownerIds.includes(id));
 
-  let profiles = new Map<string, any>();
-  if (userIds.length) {
-    const { data: profs, error } = await supabase.from("profiles").select("id, display_name, photo_url, photo_urls").in("id", userIds);
-    if (error) throw error;
-    profiles = new Map((profs || []).map((p: any) => [p.id, p]));
+  let extraProfiles: any[] = [];
+  if (extraProfileIds.length) {
+    const res = await supabase
+      .from("profiles")
+      .select("id, display_name, photo_url, photo_urls")
+      .in("id", extraProfileIds);
+    extraProfiles = res.data || [];
   }
 
+  const profileMap = new Map([...(ownerProfiles || []), ...extraProfiles].map((p: any) => [p.id, p]));
   const commentsByMedia = new Map<string, any[]>();
-  (comments || []).forEach((c: any) => {
-    commentsByMedia.set(c.media_id, [...(commentsByMedia.get(c.media_id) || []), { ...c, profile: profiles.get(c.user_id) || null }]);
-  });
-
   const reactionsByMedia = new Map<string, any[]>();
-  (reactions || []).forEach((r: any) => {
-    reactionsByMedia.set(r.media_id, [...(reactionsByMedia.get(r.media_id) || []), { ...r, profile: profiles.get(r.user_id) || null }]);
+
+  (comments || []).forEach((c: any) => {
+    commentsByMedia.set(c.media_id, [
+      ...(commentsByMedia.get(c.media_id) || []),
+      { ...c, profile: profileMap.get(c.user_id) || null },
+    ]);
   });
 
-  return (media || []).map((m: any) => ({
-    ...m,
-    profile: profiles.get(m.user_id) || null,
-    comments: commentsByMedia.get(m.id) || [],
-    reactions: reactionsByMedia.get(m.id) || [],
+  (reactions || []).forEach((r: any) => {
+    reactionsByMedia.set(r.media_id, [
+      ...(reactionsByMedia.get(r.media_id) || []),
+      { ...r, profile: profileMap.get(r.user_id) || null },
+    ]);
+  });
+
+  return rows.map((row: any) => ({
+    ...row,
+    profile: profileMap.get(row.user_id) || null,
+    comments: commentsByMedia.get(row.id) || [],
+    reactions: reactionsByMedia.get(row.id) || [],
   }));
 }
 
 export async function addEventMediaComment(eventId: string, mediaId: string, userId: string, body: string) {
-  const text = String(body || "").trim();
-  if (!text) throw new Error("Comment cannot be empty.");
+  const trimmed = body.trim();
+  if (!trimmed) throw new Error("Comment is required.");
+
   const { error } = await supabase.from("event_media_comments").insert({
     event_id: eventId,
     media_id: mediaId,
     user_id: userId,
-    body: text,
+    body: trimmed,
   });
+
   if (error) throw error;
 }
 
@@ -64,12 +87,13 @@ export async function toggleEventMediaReaction(eventId: string, mediaId: string,
     .eq("user_id", userId)
     .eq("emoji", emoji)
     .maybeSingle();
+
   if (readError) throw readError;
 
   if (existing?.id) {
     const { error } = await supabase.from("event_media_reactions").delete().eq("id", existing.id);
     if (error) throw error;
-    return { toggledOff: true };
+    return;
   }
 
   const { error } = await supabase.from("event_media_reactions").insert({
@@ -78,6 +102,6 @@ export async function toggleEventMediaReaction(eventId: string, mediaId: string,
     user_id: userId,
     emoji,
   });
+
   if (error) throw error;
-  return { toggledOff: false };
 }

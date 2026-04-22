@@ -1,26 +1,25 @@
-Your uploaded app/events-app/page.tsx is truncated mid-file, so I did not overwrite it blindly.
+This package gives you the stable missing shared infrastructure.
 
-Do these edits in your current app/events-app/page.tsx:
+Still patch these two app-specific areas in your repo:
 
-1. Make sure these imports exist:
-import { canEditPastEventMistake, deleteEventByOwner } from "../../lib/eventCrud";
+1. app/events-app/page.tsx
+- Use `lib/eventMedia.ts` for gallery comments/reactions.
+- Render video with an explicit source tag:
 
-2. Keep form collapsed by default:
-const [formMode, setFormMode] = useState<"closed" | "create" | "edit">("closed");
-
-3. Add Create Event CTA for users with 1+ karma:
-{karmaPoints >= 1 && formMode === "closed" ? <button className="button" onClick={openCreate}>Create Event</button> : null}
-
-4. Delete events using deleteEventByOwner(...) from lib/eventCrud.ts
-
-5. For event videos use:
-<video controls preload="metadata" style={{ width: "100%", borderRadius: 12, background: "#000" }}>
+<video controls playsInline preload="metadata" style={{ width: "100%", borderRadius: 12, background: "#000" }}>
   <source src={item.media_url} type={item.media_type || "video/mp4"} />
 </video>
 
-6. For past events, only show Edit when:
-canEditPastEventMistake(ev)
+- Gate "Check in to Event" so it only appears after the event has started.
+- Gate "Upload to event gallery" so it only appears after the event has started.
+- Keep create-event form collapsed until the user clicks a Create Event CTA.
+- Show Create Event CTA whenever the user has at least 1 karma.
+- Prevent duplicate event badges by checking existing badges before awarding.
 
-7. Before awarding a badge, check listBadgesForUser(userId) and stop if the user already has the same event badge.
+2. Invite logic / signup flow
+- Update signup so invited email addresses bypass waiting-room creation.
+- I did not guess your exact invite table name because your repo drifted and that is the part most likely to break if guessed incorrectly.
 
-Your missing lib/components/messages files were likely the real reason several buttons appeared to do nothing.
+3. Groups reactions
+- Use the same hover-name technique as event media/message reactions:
+  create a tooltip or popover containing links to the profiles of users who reacted.
