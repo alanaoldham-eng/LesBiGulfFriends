@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { ClientShell } from "../../components/ClientShell";
 import { getCurrentUser } from "../../lib/auth";
-import { listProfilesForAdmin, rewardUserKarma, grantBadge } from "../../lib/db";
+import { grantBadge, listBadgesForUser, listProfilesForAdmin, rewardUserKarma } from "../../lib/db";
 import { supabase } from "../../lib/supabase/client";
 
 const ADMIN_EMAIL = "alanaoldham@gmail.com";
@@ -29,7 +29,7 @@ export default function AdminRewardsPage() {
 
       const [rows, eventsRes] = await Promise.all([
         listProfilesForAdmin().catch(() => []),
-        supabase.from("events").select("id, title, starts_at").order("starts_at", { ascending: false }).limit(100),
+        supabase.from("events").select("id, title, starts_at").order("starts_at", { ascending: false }).limit(200),
       ]);
       setProfiles(rows);
       setEventBadgeOptions((eventsRes.data || []).map((ev: any) => ({
@@ -61,6 +61,12 @@ export default function AdminRewardsPage() {
     try {
       const selected = badgeOptions.find((b) => b.value === badgeSelection);
       if (!selected) throw new Error("Select a badge first.");
+      const existing = await listBadgesForUser(badgeUserId).catch(() => []);
+      const already = (existing || []).some((b: any) => b.badge_key === selected.badgeKey && b.badge_label === selected.badgeLabel);
+      if (already) {
+        setStatus("That user already has that badge.");
+        return;
+      }
       await grantBadge(badgeUserId, selected.badgeKey, selected.badgeLabel, selected.badgeEmoji, null);
       setStatus("Badge granted.");
     } catch (e: any) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ClientShell } from "../../components/ClientShell";
 import { EmptyState } from "../../components/EmptyState";
 import { getCurrentUser } from "../../lib/auth";
@@ -15,22 +15,14 @@ import {
   listBadgesForUser,
   type RelationshipStatus,
 } from "../../lib/db";
-import {
-  getEmailNotificationSettings,
-  upsertEmailNotificationSettings,
-} from "../../lib/notificationSettings";
+import { getEmailNotificationSettings, upsertEmailNotificationSettings } from "../../lib/notificationSettings";
 
 function formatKarma(value: any) {
   const num = Number(value || 0);
   return Number.isInteger(num) ? String(num) : num.toFixed(1).replace(/\.0$/, "");
 }
 
-const RELATIONSHIP_OPTIONS = [
-  "single",
-  "coupled",
-  "in an open relationship",
-  "it's complicated",
-] as const;
+const RELATIONSHIP_OPTIONS = ["single", "coupled", "in an open relationship", "it's complicated"] as const;
 
 export default function ProfilePage() {
   const [userId, setUserId] = useState("");
@@ -53,6 +45,16 @@ export default function ProfilePage() {
     email_event_invites: false,
   });
   const canAddMorePhotos = photoUrls.length < 3;
+
+  const visibleBadges = useMemo(() => {
+    const seen = new Set<string>();
+    return badges.filter((b: any) => {
+      const key = `${b.badge_key}|${b.badge_label}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [badges]);
 
   useEffect(() => {
     const run = async () => {
@@ -172,9 +174,9 @@ export default function ProfilePage() {
         <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
           Set a nickname or display name so the app shows that instead of your email address. Add up to 3 photos, choose their order, and tell people a little about yourself.
         </p>
-        {badges.length ? (
+        {visibleBadges.length ? (
           <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {badges.map((badge) => (
+            {visibleBadges.map((badge: any) => (
               <span key={badge.id} style={{ padding: "6px 10px", borderRadius: 999, background: "#fff7fb", border: "1px solid #f1dfe8" }}>
                 {badge.emoji} {badge.badge_label}
               </span>
@@ -198,105 +200,35 @@ export default function ProfilePage() {
         ) : null}
       </section>
 
-      {loading ? (
-        <EmptyState title="Loading profile" body="Checking your session and pulling your profile..." />
-      ) : (
+      {loading ? <EmptyState title="Loading profile" body="Checking your session and pulling your profile..." /> : (
         <div className="grid">
           <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
-            {photoUrls[0] ? (
-              <div style={{ marginBottom: 16 }}>
-                <img
-                  src={photoUrls[0]}
-                  alt="Main profile"
-                  style={{ width: "100%", maxWidth: 360, aspectRatio: "1 / 1", objectFit: "cover", borderRadius: 20, border: "1px solid #ead5df" }}
-                />
-                <div style={{ marginTop: 8, fontWeight: 700, opacity: 0.85 }}>Primary profile photo</div>
-              </div>
-            ) : null}
-
+            {photoUrls[0] ? <div style={{ marginBottom: 16 }}><img src={photoUrls[0]} alt="Main profile" style={{ width: "100%", maxWidth: 360, aspectRatio: "1 / 1", objectFit: "cover", borderRadius: 20, border: "1px solid #ead5df" }} /><div style={{ marginTop: 8, fontWeight: 700, opacity: 0.85 }}>Primary profile photo</div></div> : null}
             <div style={{ display: "grid", gap: 12 }}>
-              <input id="display-name" name="displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Nickname or display name" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-              <textarea id="bio" name="bio" value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Bio" style={{ minHeight: 120, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-              {photoUrls.length > 1 ? (
-                <div style={{ display: "grid", gap: 10 }}>
-                  <div style={{ fontWeight: 700, opacity: 0.85 }}>More photos</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
-                    {photoUrls.slice(1, 3).map((url, idx) => (
-                      <img key={url} src={url} alt={`Additional profile ${idx + 2}`} style={{ width: "100%", aspectRatio: "1 / 1", objectFit: "cover", borderRadius: 18, border: "1px solid #ead5df" }} />
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              <input id="interests" name="interests" value={interests} onChange={(e) => setInterests(e.target.value)} placeholder="Interests (comma separated)" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-              <input id="city" name="city" value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-              <select id="relationship-status" name="relationshipStatus" value={relationshipStatus} onChange={(e) => setRelationshipStatus(e.target.value as RelationshipStatus | "")} style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, background: "#fff" }}>
+              <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Nickname or display name" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+              <textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Bio" style={{ minHeight: 120, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+              {photoUrls.length > 1 ? <div style={{ display: "grid", gap: 10 }}><div style={{ fontWeight: 700, opacity: 0.85 }}>More photos</div><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>{photoUrls.slice(1, 3).map((url, idx) => <img key={url} src={url} alt={`Additional profile ${idx + 2}`} style={{ width: "100%", aspectRatio: "1 / 1", objectFit: "cover", borderRadius: 18, border: "1px solid #ead5df" }} />)}</div></div> : null}
+              <input value={interests} onChange={(e) => setInterests(e.target.value)} placeholder="Interests (comma separated)" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+              <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+              <select value={relationshipStatus} onChange={(e) => setRelationshipStatus(e.target.value as RelationshipStatus | "")} style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, background: "#fff" }}>
                 <option value="">Relationship status</option>
                 {RELATIONSHIP_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
               </select>
 
               <div style={{ display: "grid", gap: 10, border: "1px solid #f1dfe8", borderRadius: 18, padding: 12, background: "#fffafc" }}>
                 <strong>Email notifications (opt in)</strong>
-                <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <input type="checkbox" checked={notificationSettings.email_friend_requests} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_friend_requests: e.target.checked }))} />
-                  <span>Email me when I get a friend request</span>
-                </label>
-                <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <input type="checkbox" checked={notificationSettings.email_private_messages} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_private_messages: e.target.checked }))} />
-                  <span>Email me when I get a private message</span>
-                </label>
-                <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <input type="checkbox" checked={notificationSettings.email_breakfast_reminders} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_breakfast_reminders: e.target.checked }))} />
-                  <span>Email me a Breakfast of Champions reminder</span>
-                </label>
-                <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <input type="checkbox" checked={notificationSettings.email_event_invites} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_event_invites: e.target.checked }))} />
-                  <span>Email me about public and private event invites</span>
-                </label>
+                <label style={{ display: "flex", gap: 10, alignItems: "center" }}><input type="checkbox" checked={notificationSettings.email_friend_requests} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_friend_requests: e.target.checked }))} /><span>Email me when I get a friend request</span></label>
+                <label style={{ display: "flex", gap: 10, alignItems: "center" }}><input type="checkbox" checked={notificationSettings.email_private_messages} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_private_messages: e.target.checked }))} /><span>Email me when I get a private message</span></label>
+                <label style={{ display: "flex", gap: 10, alignItems: "center" }}><input type="checkbox" checked={notificationSettings.email_breakfast_reminders} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_breakfast_reminders: e.target.checked }))} /><span>Email me a Breakfast of Champions reminder</span></label>
+                <label style={{ display: "flex", gap: 10, alignItems: "center" }}><input type="checkbox" checked={notificationSettings.email_event_invites} onChange={(e) => setNotificationSettings((prev) => ({ ...prev, email_event_invites: e.target.checked }))} /><span>Email me about public and private event invites</span></label>
               </div>
 
               <div style={{ display: "grid", gap: 10 }}>
                 <strong>Profile photos</strong>
                 <p style={{ margin: 0, opacity: 0.75 }}>Upload up to 3 profile photos. The first one appears at the top of your profile.</p>
-                {canAddMorePhotos ? <input id="profile-photo-upload" name="profilePhotoUpload" type="file" accept="image/*" onChange={(e) => uploadPhoto(e.target.files?.[0])} style={{ padding: "10px 0" }} /> : <p style={{ margin: 0, opacity: 0.75 }}>You have reached the 3 photo limit. Remove a photo to upload another.</p>}
-
-                {photoUrls[0] ? (
-                  <div style={{ border: "1px solid #f1dfe8", borderRadius: 18, padding: 12, background: "#fffafc" }}>
-                    <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                      <img src={photoUrls[0]} alt="Primary profile" style={{ width: 88, height: 88, objectFit: "cover", borderRadius: 16, border: "1px solid #ead5df" }} />
-                      <div style={{ display: "grid", gap: 8 }}>
-                        <strong>Main profile photo</strong>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <button className="button secondary" onClick={() => movePhoto(0, 1)} disabled={photoUrls.length < 2}>Move down</button>
-                          <button className="button secondary" onClick={() => removePhoto(0)}>Delete</button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                {photoUrls.length > 1 ? (
-                  <div style={{ display: "grid", gap: 12 }}>
-                    <div style={{ fontWeight: 700, opacity: 0.85 }}>Additional photos</div>
-                    {photoUrls.slice(1).map((url, extraIndex) => {
-                      const index = extraIndex + 1;
-                      return (
-                        <div key={url} style={{ border: "1px solid #f1dfe8", borderRadius: 18, padding: 12, background: "#fffafc" }}>
-                          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                            <img src={url} alt={`Profile ${index + 1}`} style={{ width: 88, height: 88, objectFit: "cover", borderRadius: 16, border: "1px solid #ead5df" }} />
-                            <div style={{ display: "grid", gap: 8 }}>
-                              <strong>{`Photo ${index + 1}`}</strong>
-                              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                                <button className="button secondary" onClick={() => movePhoto(index, -1)}>Move up</button>
-                                <button className="button secondary" onClick={() => movePhoto(index, 1)} disabled={index === photoUrls.length - 1}>Move down</button>
-                                <button className="button secondary" onClick={() => removePhoto(index)}>Delete</button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : null}
+                {canAddMorePhotos ? <input type="file" accept="image/*" onChange={(e) => uploadPhoto(e.target.files?.[0])} style={{ padding: "10px 0" }} /> : <p style={{ margin: 0, opacity: 0.75 }}>You have reached the 3 photo limit. Remove a photo to upload another.</p>}
+                {photoUrls[0] ? <div style={{ border: "1px solid #f1dfe8", borderRadius: 18, padding: 12, background: "#fffafc" }}><div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}><img src={photoUrls[0]} alt="Primary profile" style={{ width: 88, height: 88, objectFit: "cover", borderRadius: 16, border: "1px solid #ead5df" }} /><div style={{ display: "grid", gap: 8 }}><strong>Main profile photo</strong><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button className="button secondary" onClick={() => movePhoto(0, 1)} disabled={photoUrls.length < 2}>Move down</button><button className="button secondary" onClick={() => removePhoto(0)}>Delete</button></div></div></div></div> : null}
+                {photoUrls.length > 1 ? <div style={{ display: "grid", gap: 12 }}>{photoUrls.slice(1).map((url, extraIndex) => { const index = extraIndex + 1; return <div key={url} style={{ border: "1px solid #f1dfe8", borderRadius: 18, padding: 12, background: "#fffafc" }}><div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}><img src={url} alt={`Profile ${index + 1}`} style={{ width: 88, height: 88, objectFit: "cover", borderRadius: 16, border: "1px solid #ead5df" }} /><div style={{ display: "grid", gap: 8 }}><strong>{`Photo ${index + 1}`}</strong><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}><button className="button secondary" onClick={() => movePhoto(index, -1)}>Move up</button><button className="button secondary" onClick={() => movePhoto(index, 1)} disabled={index === photoUrls.length - 1}>Move down</button><button className="button secondary" onClick={() => removePhoto(index)}>Delete</button></div></div></div></div>; })}</div> : null}
               </div>
 
               <button className="button" onClick={save} disabled={!userId || !displayName}>Save profile</button>

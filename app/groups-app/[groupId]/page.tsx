@@ -7,7 +7,7 @@ import { ClientShell } from "../../../components/ClientShell";
 import { getCurrentUser } from "../../../lib/auth";
 import { createCommunityGroup } from "../../../lib/community";
 import { editGroupMessageByAuthor } from "../../../lib/messageEditing";
-import { removeMemberFromCommunity } from "../../../lib/moderation";
+import { removeMemberFromCommunity, setGroupModeratorStatus } from "../../../lib/moderation";
 import {
   getFriendIds,
   getGroupById,
@@ -413,7 +413,7 @@ export default function GroupThreadPage() {
 
   const toggleMod = async (userId: string, currentlyMod: boolean) => {
     try {
-      await updateGroupMemberRole(groupId, userId, currentlyMod ? "member" : "mod");
+      await setGroupModeratorStatus({ groupId, userId, makeModerator: !currentlyMod });
       setStatus(currentlyMod ? "Moderator privileges removed." : "Moderator privileges granted.");
       await refresh(me);
     } catch (e: any) {

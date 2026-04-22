@@ -17,32 +17,27 @@ export async function uploadEventAsset(userId: string, file: File) {
   });
   if (error) throw error;
   const { data } = supabase.storage.from("event-media").getPublicUrl(path);
-  return {
-    url: data.publicUrl,
-    type: file.type,
-  };
+  return { url: data.publicUrl, type: file.type };
 }
 
-export async function updateEventByOwner(
-  eventId: string,
-  ownerId: string,
-  updates: {
-    title?: string;
-    description?: string | null;
-    starts_at?: string;
-    location?: string | null;
-    cover_image_url?: string | null;
-    link_url?: string | null;
-    is_public?: boolean;
-  },
-) {
-  const { error } = await supabase
+export async function updateEventByOwner(eventId: string, ownerId: string, updates: {
+  title?: string;
+  description?: string | null;
+  starts_at?: string;
+  location?: string | null;
+  cover_image_url?: string | null;
+  link_url?: string | null;
+  is_public?: boolean;
+}) {
+  const { data: updated, error } = await supabase
     .from("events")
     .update(updates)
     .eq("id", eventId)
-    .eq("created_by", ownerId);
-
+    .eq("created_by", ownerId)
+    .select("id")
+    .maybeSingle();
   if (error) throw error;
+  if (!updated?.id) throw new Error("Event update did not persist.");
 }
 
 export async function listEventMedia(eventId: string) {
@@ -51,7 +46,6 @@ export async function listEventMedia(eventId: string) {
     .select("*")
     .eq("event_id", eventId)
     .order("created_at", { ascending: false });
-
   if (error) throw error;
   return data || [];
 }
@@ -74,17 +68,18 @@ export async function awardEventBadgeToUser(args: {
   eventDate: string;
   awardedBy?: string | null;
 }) {
-  const { data: existing } = await supabase
+  const badgeLabel = `Attended ${args.eventName} • ${args.eventDate}`;
+  const { data: existing, error: readError } = await supabase
     .from("user_badges")
     .select("id")
     .eq("user_id", args.userId)
     .eq("badge_key", "event_attended")
-    .contains("meta", { eventName: args.eventName, eventDate: args.eventDate })
+    .eq("badge_label", badgeLabel)
     .limit(1);
+  if (readError) throw readError;
+  if ((existing || []).length) throw new Error("User already has that badge.");
 
-  if ((existing || []).length) return;
-
-  await grantBadge(args.userId, "event_attended", `Attended ${args.eventName} • ${args.eventDate}`, "🎟️", null);
+  await grantBadge(args.userId, "event_attended", badgeLabel, "🎟️", null);
 
   await supabase
     .from("user_badges")
@@ -97,6 +92,7 @@ export async function awardEventBadgeToUser(args: {
     })
     .eq("user_id", args.userId)
     .eq("badge_key", "event_attended")
+    .eq("badge_label", badgeLabel)
     .is("meta", null);
 }
 
@@ -117,7 +113,6 @@ export async function checkInToEventWithRewards(args: {
     .eq("game_key", "event_checkin")
     .limit(1)
     .maybeSingle();
-
   if (existingError) throw existingError;
   if (existing?.id) throw new Error("You already checked in to this event.");
 
@@ -159,19 +154,20 @@ export async function checkInToEventWithRewards(args: {
     longitude: args.longitude ?? null,
     verified_method: "manual",
   });
-
   if (error) throw error;
 
   if (reward > 0) {
     await rewardUserKarma(args.userId, reward, `event_attendance:${args.eventId}`);
   }
 
-  await awardEventBadgeToUser({
-    userId: args.userId,
-    eventName: args.eventName,
-    eventDate: args.eventDate,
-    awardedBy: null,
-  });
+  try {
+    await awardEventBadgeToUser({
+      userId: args.userId,
+      eventName: args.eventName,
+      eventDate: args.eventDate,
+      awardedBy: null,
+    });
+  } catch {}
 
   return { reward };
 }

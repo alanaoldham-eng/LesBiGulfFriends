@@ -18,36 +18,25 @@ import {
   getFriendIds,
   sendFriendRequest,
   listFriends,
+  listBadgesForUser,
 } from "../../lib/db";
 import {
   attachEventMedia,
   awardEventBadgeToUser,
   checkInToEventWithRewards,
-  listEventMedia,
   updateEventByOwner,
   uploadEventAsset,
 } from "../../lib/eventFeatures";
 import { editEventMessageByAuthor } from "../../lib/messageEditing";
 import { getViewerRoleFlags } from "../../lib/roadmap";
-import { deleteEventByOwner } from "../../lib/eventCrud";
+import { canEditPastEventMistake, deleteEventByOwner } from "../../lib/eventCrud";
 import { supabase } from "../../lib/supabase/client";
+import { addEventMediaComment, listEventMediaBundle, toggleEventMediaReaction } from "../../lib/eventMedia";
 
 const EMOJIS = ["❤️", "👍", "😂", "🔥", "👏"];
+const REACT_SMALL: React.CSSProperties = { padding: "6px 8px", borderRadius: 10, border: "1px solid #f1dfe8", background: "#fff", fontSize: 12, lineHeight: 1.1, cursor: "pointer", whiteSpace: "nowrap" };
 
-function EventMessageCard({
-  m,
-  me,
-  friendIds,
-  onAddFriend,
-  onReply,
-  onReact,
-  onEditStart,
-  isEditing,
-  editBody,
-  setEditBody,
-  onEditSave,
-  onEditCancel,
-}: any) {
+function EventMessageCard({ m, me, friendIds, onAddFriend, onReply, onReact, onEditStart, isEditing, editBody, setEditBody, onEditSave, onEditCancel }: any) {
   const mainPhoto = m.profile?.photo_urls?.[0] || m.profile?.photo_url || null;
   const isFriend = friendIds.has(m.sender_id);
   const grouped = new Map<string, number>();
@@ -56,17 +45,12 @@ function EventMessageCard({
   return (
     <div style={{ marginBottom: 14, paddingLeft: m.parent_message_id ? 20 : 0, borderLeft: m.parent_message_id ? "3px solid #f1dfe8" : "none" }}>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-        {mainPhoto ? (
-          <img src={mainPhoto} alt={m.profile?.display_name || "Member"} style={{ width: 38, height: 38, borderRadius: 999, objectFit: "cover", border: "1px solid #ead5df" }} />
-        ) : null}
+        {mainPhoto ? <img src={mainPhoto} alt={m.profile?.display_name || "Member"} style={{ width: 38, height: 38, borderRadius: 999, objectFit: "cover", border: "1px solid #ead5df" }} /> : null}
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <Link href={`/members/${m.sender_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>
-              {m.sender_id === me ? "You" : m.profile?.display_name || m.sender_id}
-            </Link>
-            {m.sender_id !== me && !isFriend ? <button className="button secondary" onClick={() => onAddFriend(m.sender_id)}>Add Friend</button> : null}
-            {m.parent_message_id ? <span style={{ opacity: 0.6, fontSize: 12 }}>Reply</span> : null}
-            {m.sender_id === me ? <button className="button secondary" onClick={() => onEditStart(m)}>Edit</button> : null}
+            <Link href={`/members/${m.sender_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>{m.sender_id === me ? "You" : (m.profile?.display_name || m.sender_id)}</Link>
+            {m.sender_id !== me && !isFriend ? <button style={REACT_SMALL} onClick={() => onAddFriend(m.sender_id)}>Add Friend</button> : null}
+            {m.sender_id === me ? <button style={REACT_SMALL} onClick={() => onEditStart(m)}>Edit</button> : null}
             {m.edited_at ? <span style={{ opacity: 0.55, fontSize: 12 }}>edited</span> : null}
           </div>
 
@@ -82,24 +66,70 @@ function EventMessageCard({
             <>
               {m.body ? <div style={{ marginTop: 4, whiteSpace: "pre-wrap" }}>{m.body}</div> : null}
               {m.link_url ? <div style={{ marginTop: 6 }}><a href={m.link_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>{m.link_url}</a></div> : null}
-              {m.media_url ? (
-                <div style={{ marginTop: 8 }}>
-                  {String(m.media_type || "").startsWith("image/") ? (
-                    <img src={m.media_url} alt="Attachment" style={{ maxWidth: "100%", borderRadius: 14, border: "1px solid #ead5df" }} />
-                  ) : (
-                    <a href={m.media_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>
-                      Open attachment
-                    </a>
-                  )}
-                </div>
-              ) : null}
+              {m.media_url ? <div style={{ marginTop: 8 }}>{String(m.media_type || "").startsWith("image/") ? <img src={m.media_url} alt="Attachment" style={{ maxWidth: "100%", borderRadius: 14, border: "1px solid #ead5df" }} /> : <a href={m.media_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>Open attachment</a>}</div> : null}
             </>
           )}
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-            <button className="button secondary" onClick={() => onReply(m.id)}>Reply</button>
-            {EMOJIS.map((emoji) => <button key={emoji} className="button secondary" onClick={() => onReact(m.id, emoji)}>{emoji} {grouped.get(emoji) || ""}</button>)}
+          <div style={{ display: "flex", gap: 6, flexWrap: "nowrap", overflowX: "auto", marginTop: 8 }}>
+            <button style={REACT_SMALL} onClick={() => onReply(m.id)}>Reply</button>
+            {EMOJIS.map((emoji) => <button key={emoji} style={REACT_SMALL} onClick={() => onReact(m.id, emoji)}>{emoji} {grouped.get(emoji) || ""}</button>)}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EventMediaCard({ item, me, eventId, onRefresh, statusSetter }: any) {
+  const [comment, setComment] = useState("");
+  const grouped = new Map<string, number>();
+  (item.reactions || []).forEach((r: any) => grouped.set(r.emoji, (grouped.get(r.emoji) || 0) + 1));
+
+  const react = async (emoji: string) => {
+    try {
+      await toggleEventMediaReaction(eventId, item.id, me, emoji);
+      await onRefresh();
+    } catch (e: any) {
+      statusSetter(e.message || "Unable to react to media.");
+    }
+  };
+
+  const sendComment = async () => {
+    try {
+      await addEventMediaComment(eventId, item.id, me, comment);
+      setComment("");
+      await onRefresh();
+    } catch (e: any) {
+      statusSetter(e.message || "Unable to comment on media.");
+    }
+  };
+
+  return (
+    <div style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 10, background: "#fff" }}>
+      {String(item.media_type || "").startsWith("image/") ? (
+        <img src={item.media_url} alt="Event media" style={{ width: "100%", borderRadius: 12, objectFit: "cover" }} />
+      ) : (
+        <video controls preload="metadata" style={{ width: "100%", borderRadius: 12, background: "#000" }}>
+          <source src={item.media_url} type={item.media_type || "video/mp4"} />
+        </video>
+      )}
+      <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
+        Uploaded by {item.profile?.display_name || "member"}
+      </div>
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "nowrap", overflowX: "auto", marginTop: 8 }}>
+        {EMOJIS.map((emoji) => <button key={emoji} style={REACT_SMALL} onClick={() => react(emoji)}>{emoji} {grouped.get(emoji) || ""}</button>)}
+      </div>
+
+      <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+        {(item.comments || []).map((c: any) => (
+          <div key={c.id} style={{ borderTop: "1px solid #f5e8ef", paddingTop: 8, fontSize: 13 }}>
+            <strong>{c.profile?.display_name || "Member"}:</strong> {c.body}
+          </div>
+        ))}
+        <div style={{ display: "grid", gap: 6 }}>
+          <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Comment on this photo or video" style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 14 }} />
+          <button style={REACT_SMALL} onClick={sendComment}>Comment</button>
         </div>
       </div>
     </div>
@@ -134,17 +164,29 @@ export default function EventsAppPage() {
   const [status, setStatus] = useState("");
   const [karmaPoints, setKarmaPoints] = useState(0);
   const [canReview, setCanReview] = useState(false);
-  const [editingEvent, setEditingEvent] = useState(false);
+  const [formMode, setFormMode] = useState<"closed" | "create" | "edit">("closed");
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingMessageBody, setEditingMessageBody] = useState("");
   const [awardUserId, setAwardUserId] = useState("");
   const [awardOptions, setAwardOptions] = useState<any[]>([]);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   const nowTs = Date.now();
   const selectedEventDateLabel = useMemo(() => selectedEvent?.starts_at ? new Date(selectedEvent.starts_at).toLocaleDateString() : "", [selectedEvent]);
   const upcomingEvents = useMemo(() => [...events].filter((ev: any) => new Date(ev.starts_at).getTime() >= nowTs).sort((a: any, b: any) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()), [events, nowTs]);
   const pastEvents = useMemo(() => [...events].filter((ev: any) => new Date(ev.starts_at).getTime() < nowTs).sort((a: any, b: any) => new Date(b.starts_at).getTime() - new Date(a.starts_at).getTime()), [events, nowTs]);
   const selectedEventIsPast = selectedEvent ? new Date(selectedEvent.starts_at).getTime() < nowTs : false;
+
+  const clearForm = () => {
+    setTitle("");
+    setDescription("");
+    setStartsAt("");
+    setLocation("");
+    setLinkUrl("");
+    setIsPublic(true);
+    setCoverFile(null);
+    setSelectedFriendIds([]);
+  };
 
   const refreshEvents = async (uid: string) => {
     const [rows, profile, fids, friendRows, roleFlags] = await Promise.all([
@@ -172,30 +214,56 @@ export default function EventsAppPage() {
     run();
   }, []);
 
-  const buildAwardOptions = async () => {
+  const loadAwardOptions = async () => {
     const { data: profiles } = await supabase.from("profiles").select("id, display_name").order("display_name", { ascending: true }).limit(500);
     setAwardOptions((profiles || []).map((p: any) => ({ id: p.id, label: p.display_name || p.id })));
   };
 
+  const refreshSelectedEventDetails = async (eventId?: string) => {
+    const id = eventId || selectedEvent?.id;
+    if (!id) return;
+    setLoadingDetails(true);
+    const [invs, msgs, media] = await Promise.all([
+      listEventInvites(id).catch(() => []),
+      listEventMessagesDetailed(id).catch(() => []),
+      listEventMediaBundle(id).catch(() => []),
+      loadAwardOptions(),
+    ]);
+    setEventInvites(invs);
+    setEventMessages(msgs);
+    setEventMedia(media);
+    setLoadingDetails(false);
+  };
+
   const openEvent = async (ev: any) => {
     setSelectedEvent(ev);
-    setEditingEvent(false);
+    setEditingMessageId(null);
+    setEditingMessageBody("");
+    setEventInvites([]);
+    setEventMessages([]);
+    setEventMedia([]);
+    setStatus("");
+    setTimeout(() => { refreshSelectedEventDetails(ev.id); }, 0);
+  };
+
+  const openCreate = () => {
+    clearForm();
+    setSelectedEvent(null);
+    setFormMode("create");
+  };
+
+  const openEdit = async (ev: any) => {
+    setSelectedEvent(ev);
     setTitle(ev.title || "");
     setDescription(ev.description || "");
     setStartsAt(ev.starts_at ? String(ev.starts_at).slice(0, 16) : "");
     setLocation(ev.location || "");
     setLinkUrl(ev.link_url || "");
     setIsPublic(ev.is_public ?? true);
-
-    const [invs, msgs, media] = await Promise.all([
-      listEventInvites(ev.id).catch(() => []),
-      listEventMessagesDetailed(ev.id).catch(() => []),
-      listEventMedia(ev.id).catch(() => []),
-      buildAwardOptions(),
-    ]);
-    setEventInvites(invs);
-    setEventMessages(msgs);
-    setEventMedia(media);
+    setCoverFile(null);
+    setSelectedFriendIds([]);
+    setFormMode("edit");
+    await openEvent(ev);
   };
 
   const createOrUpdate = async () => {
@@ -207,7 +275,7 @@ export default function EventsAppPage() {
         coverImageUrl = uploaded.url;
       }
 
-      if (editingEvent && selectedEvent?.id) {
+      if (formMode === "edit" && selectedEvent?.id) {
         await updateEventByOwner(selectedEvent.id, me, {
           title,
           description: description || null,
@@ -218,46 +286,21 @@ export default function EventsAppPage() {
           is_public: isPublic,
         });
         setStatus("Event updated.");
+        setSelectedEvent({ ...selectedEvent, title, description, starts_at: startsAt, location, cover_image_url: coverImageUrl, link_url: linkUrl, is_public: isPublic });
+        setFormMode("closed");
       } else {
-        const ev = await createEvent({
-          title,
-          description,
-          starts_at: startsAt,
-          location,
-          created_by: me,
-        });
-
-        await updateEventByOwner(ev.id, me, {
-          cover_image_url: coverImageUrl,
-          link_url: linkUrl || null,
-          is_public: isPublic,
-        });
-
+        const ev = await createEvent({ title, description, starts_at: startsAt, location, created_by: me });
+        await updateEventByOwner(ev.id, me, { cover_image_url: coverImageUrl, link_url: linkUrl || null, is_public: isPublic });
         if (isPublic) {
-          await fetch("/api/events/invite", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ mode: "public", eventId: ev.id, ownerId: me }),
-          });
+          await fetch("/api/events/invite", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "public", eventId: ev.id, ownerId: me }) });
         } else if (selectedFriendIds.length) {
-          await fetch("/api/events/invite", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ mode: "private", eventId: ev.id, ownerId: me, friendIds: selectedFriendIds }),
-          });
+          await fetch("/api/events/invite", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "private", eventId: ev.id, ownerId: me, friendIds: selectedFriendIds }) });
         }
-
         setStatus("Event created.");
+        setFormMode("closed");
       }
 
-      setTitle("");
-      setDescription("");
-      setStartsAt("");
-      setLocation("");
-      setLinkUrl("");
-      setIsPublic(true);
-      setCoverFile(null);
-      setSelectedFriendIds([]);
+      clearForm();
       await refreshEvents(me);
     } catch (e: any) {
       setStatus(e.message || "Unable to save event.");
@@ -296,14 +339,14 @@ export default function EventsAppPage() {
       const localRow = await sendEventInviteEmail(inviteEmail.trim(), selectedEvent.title, selectedEvent.starts_at, selectedEvent.location || "");
       setStatus(localRow.ok ? "Invite email sent." : localRow.error || "Invite email failed.");
       setInviteEmail("");
-      await openEvent(selectedEvent);
+      await refreshSelectedEventDetails();
     } catch (e: any) {
       setStatus(e.message || "Unable to send event invite.");
     }
   };
 
   const retryEventInvite = async (row: any) => {
-    if (selectedEventIsPast) return;
+    if (!selectedEvent || selectedEventIsPast) return;
     const sendResult = await sendEventInviteEmail(row.invitee_email, selectedEvent.title, selectedEvent.starts_at, selectedEvent.location || "");
     if (!sendResult.ok) {
       await updateEventInviteStatus(row.id, "failed", null, sendResult.error || "Unable to send email", null);
@@ -312,7 +355,7 @@ export default function EventsAppPage() {
       await updateEventInviteStatus(row.id, "sent", sendResult.sentAt, null, sendResult.resendMessageId || null);
       setStatus("Event invite email sent.");
     }
-    await openEvent(selectedEvent);
+    await refreshSelectedEventDetails();
   };
 
   const sendMessage = async () => {
@@ -329,7 +372,7 @@ export default function EventsAppPage() {
       setMessageLinkUrl("");
       setAttachment(null);
       setReplyTo(null);
-      await openEvent(selectedEvent);
+      await refreshSelectedEventDetails();
     } catch (e: any) {
       setStatus(e.message || "Unable to send event message.");
     }
@@ -340,7 +383,7 @@ export default function EventsAppPage() {
       await editEventMessageByAuthor(messageId, me, editingMessageBody);
       setEditingMessageId(null);
       setEditingMessageBody("");
-      await openEvent(selectedEvent);
+      await refreshSelectedEventDetails();
       setStatus("Message updated.");
     } catch (e: any) {
       setStatus(e.message || "Unable to edit event message.");
@@ -351,7 +394,7 @@ export default function EventsAppPage() {
     if (!selectedEvent) return;
     try {
       await reactToEventMessage(selectedEvent.id, messageId, me, emoji);
-      await openEvent(selectedEvent);
+      await refreshSelectedEventDetails();
     } catch (e: any) {
       setStatus(e.message || "Unable to react.");
     }
@@ -372,7 +415,7 @@ export default function EventsAppPage() {
     try {
       await attachEventMedia(selectedEvent.id, me, galleryFile);
       setGalleryFile(null);
-      await openEvent(selectedEvent);
+      await refreshSelectedEventDetails();
       setStatus("Event media uploaded.");
     } catch (e: any) {
       setStatus(e.message || "Unable to upload event media.");
@@ -390,7 +433,7 @@ export default function EventsAppPage() {
         file: checkInFile,
       });
       setCheckInFile(null);
-      await openEvent(selectedEvent);
+      await refreshSelectedEventDetails();
       setStatus(result.reward > 0 ? `Checked in. Earned ${result.reward} karma.` : "Checked in. Daily karma cap reached.");
     } catch (e: any) {
       setStatus(e.message || "Unable to check in.");
@@ -400,12 +443,14 @@ export default function EventsAppPage() {
   const awardBadge = async () => {
     if (!selectedEvent || !awardUserId.trim() || !canReview) return;
     try {
-      await awardEventBadgeToUser({
-        userId: awardUserId.trim(),
-        eventName: selectedEvent.title,
-        eventDate: selectedEventDateLabel,
-        awardedBy: me,
-      });
+      const existing = await listBadgesForUser(awardUserId).catch(() => []);
+      const badgeLabel = `Attended ${selectedEvent.title} • ${selectedEventDateLabel}`;
+      const already = (existing || []).some((b: any) => b.badge_key === "event_attended" && b.badge_label === badgeLabel);
+      if (already) {
+        setStatus("That user already has that badge.");
+        return;
+      }
+      await awardEventBadgeToUser({ userId: awardUserId.trim(), eventName: selectedEvent.title, eventDate: selectedEventDateLabel, awardedBy: me });
       setAwardUserId("");
       setStatus("Event badge awarded.");
     } catch (e: any) {
@@ -413,18 +458,22 @@ export default function EventsAppPage() {
     }
   };
 
-  const renderEventList = (rows: any[], emptyText: string, allowDelete: boolean) =>
-    rows.length ? rows.map((ev: any) => (
-      <div key={ev.id} style={{ borderBottom: "1px solid #f1dfe8", padding: "10px 0" }}>
-        <strong>{ev.title}</strong>
-        <div style={{ opacity: 0.8 }}>{ev.starts_at}</div>
-        <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className="button secondary" onClick={() => openEvent(ev)}>Open event</button>
-          {ev.created_by === me ? <button className="button secondary" onClick={() => { openEvent(ev); setEditingEvent(true); }}>Edit event</button> : null}
-          {allowDelete && ev.created_by === me ? <button className="button secondary" onClick={() => deleteEvent(ev.id)}>Delete event</button> : null}
+  const renderEventList = (rows: any[], emptyText: string, kind: "upcoming" | "past") =>
+    rows.length ? rows.map((ev: any) => {
+      const allowPastFixEdit = kind === "past" && canEditPastEventMistake(ev);
+      return (
+        <div key={ev.id} style={{ borderBottom: "1px solid #f1dfe8", padding: "10px 0" }}>
+          <strong>{ev.title}</strong>
+          <div style={{ opacity: 0.8 }}>{new Date(ev.starts_at).toLocaleString()}</div>
+          <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="button secondary" onClick={() => openEvent(ev)}>Open event</button>
+            {kind === "upcoming" && ev.created_by === me ? <button className="button secondary" onClick={() => openEdit(ev)}>Edit event</button> : null}
+            {kind === "upcoming" && ev.created_by === me ? <button className="button secondary" onClick={() => deleteEvent(ev.id)}>Delete event</button> : null}
+            {allowPastFixEdit && ev.created_by === me ? <button className="button secondary" onClick={() => openEdit(ev)}>Edit event</button> : null}
+          </div>
         </div>
-      </div>
-    )) : <p style={{ margin: 0, opacity: 0.8 }}>{emptyText}</p>;
+      );
+    }) : <p style={{ margin: 0, opacity: 0.8 }}>{emptyText}</p>;
 
   return (
     <ClientShell>
@@ -438,49 +487,47 @@ export default function EventsAppPage() {
       <div className="grid">
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <h3 style={{ marginTop: 0 }}>Upcoming Events</h3>
-          {renderEventList(upcomingEvents, "No upcoming events yet.", true)}
+          {renderEventList(upcomingEvents, "No upcoming events yet.", "upcoming")}
         </section>
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
-          <h3 style={{ marginTop: 0 }}>{editingEvent ? "Edit event" : "Create event"}</h3>
-          {karmaPoints > 0 || editingEvent ? (
-            <div style={{ display: "grid", gap: 12 }}>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-              <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-              <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-              <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-              <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="Optional event link" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-              <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
-                <span>Public event</span>
-              </label>
-              {!isPublic ? (
-                <div style={{ display: "grid", gap: 8, border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, background: "#fffafc" }}>
-                  <strong>Select friends to invite</strong>
-                  {friends.length ? friends.map((f: any) => (
-                    <label key={f.id} style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                      <input type="checkbox" checked={selectedFriendIds.includes(f.id)} onChange={(e) => setSelectedFriendIds((prev) => e.target.checked ? [...prev, f.id] : prev.filter((id) => id !== f.id))} />
-                      <span>{f.display_name || f.email || f.id}</span>
-                    </label>
-                  )) : <div style={{ opacity: 0.75 }}>No friends available yet.</div>}
-                </div>
-              ) : null}
-              <input type="file" accept="image/*" onChange={(e) => setCoverFile(e.target.files?.[0] || null)} />
-              <div style={{ opacity: 0.75 }}>Karma available: {karmaPoints}</div>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button className="button" onClick={createOrUpdate} disabled={!me || !title || !startsAt}>
-                  {editingEvent ? "Save event" : "Create event"}
-                </button>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <h3 style={{ marginTop: 0, marginBottom: 0 }}>{formMode === "edit" ? "Edit event" : "Create event"}</h3>
+            {formMode === "closed" ? <button className="button" onClick={openCreate}>Create Event</button> : <button className="button secondary" onClick={() => { setFormMode("closed"); clearForm(); }}>Close</button>}
+          </div>
+          {formMode !== "closed" ? (
+            karmaPoints > 0 || formMode === "edit" ? (
+              <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+                <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+                <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+                <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="Optional event link" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+                <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
+                  <span>Public event</span>
+                </label>
+                {!isPublic ? (
+                  <div style={{ display: "grid", gap: 8, border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, background: "#fffafc" }}>
+                    <strong>Select friends to invite</strong>
+                    {friends.length ? friends.map((f: any) => (
+                      <label key={f.id} style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        <input type="checkbox" checked={selectedFriendIds.includes(f.id)} onChange={(e) => setSelectedFriendIds((prev) => e.target.checked ? [...prev, f.id] : prev.filter((id) => id !== f.id))} />
+                        <span>{f.display_name || f.email || f.id}</span>
+                      </label>
+                    )) : <div style={{ opacity: 0.75 }}>No friends available yet.</div>}
+                  </div>
+                ) : null}
+                <input type="file" accept="image/*" onChange={(e) => setCoverFile(e.target.files?.[0] || null)} />
+                <button className="button" onClick={createOrUpdate} disabled={!me || !title || !startsAt}>{formMode === "edit" ? "Save event" : "Create event"}</button>
               </div>
-            </div>
-          ) : (
-            <EmptyState title="Need 1 karma point" body="Creating an event costs 1 karma point. You can still view your existing events below." />
-          )}
+            ) : <EmptyState title="Need 1 karma point" body="Creating an event costs 1 karma point." />
+          ) : <p style={{ marginTop: 12, opacity: 0.75 }}>The form stays collapsed until you need it.</p>}
         </section>
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <h3 style={{ marginTop: 0 }}>Past Events</h3>
-          {renderEventList(pastEvents, "No past events yet.", false)}
+          {renderEventList(pastEvents, "No past events yet.", "past")}
         </section>
 
         {selectedEvent ? (
@@ -489,7 +536,9 @@ export default function EventsAppPage() {
             {selectedEvent.cover_image_url ? <img src={selectedEvent.cover_image_url} alt={selectedEvent.title} style={{ width: "100%", maxWidth: 420, borderRadius: 18, border: "1px solid #ead5df", marginBottom: 12 }} /> : null}
             {selectedEvent.description ? <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{selectedEvent.description}</p> : null}
             {selectedEvent.link_url ? <p><a href={selectedEvent.link_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>{selectedEvent.link_url}</a></p> : null}
-            <p style={{ opacity: 0.8 }}>{selectedEvent.starts_at} • {selectedEvent.location || "Location TBD"}</p>
+            <p style={{ opacity: 0.8 }}>{new Date(selectedEvent.starts_at).toLocaleString()} • {selectedEvent.location || "Location TBD"}</p>
+
+            {loadingDetails ? <p style={{ opacity: 0.75 }}>Loading event details…</p> : null}
 
             <div style={{ marginTop: 16, borderTop: "1px solid #f1dfe8", paddingTop: 16, display: "grid", gap: 16 }}>
               <div>
@@ -499,11 +548,9 @@ export default function EventsAppPage() {
                   <button className="button secondary" onClick={uploadGallery} disabled={!galleryFile}>Upload to event gallery</button>
                 </div>
                 {eventMedia.length ? (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
                     {eventMedia.map((item: any) => (
-                      <div key={item.id} style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 8 }}>
-                        {String(item.media_type || "").startsWith("image/") ? <img src={item.media_url} alt="Event media" style={{ width: "100%", borderRadius: 12, objectFit: "cover" }} /> : <a href={item.media_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>Open video</a>}
-                      </div>
+                      <EventMediaCard key={item.id} item={item} me={me} eventId={selectedEvent.id} onRefresh={refreshSelectedEventDetails} statusSetter={setStatus} />
                     ))}
                   </div>
                 ) : <p style={{ margin: 0, opacity: 0.75 }}>No event media yet.</p>}

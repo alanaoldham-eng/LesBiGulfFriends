@@ -2,6 +2,28 @@
 
 import { supabase } from "./supabase/client";
 
+export async function setGroupModeratorStatus(args: {
+  groupId: string;
+  userId: string;
+  makeModerator: boolean;
+}) {
+  const nextRole = args.makeModerator ? "mod" : "member";
+
+  const { data: updated, error } = await supabase
+    .from("group_members")
+    .update({ role: nextRole })
+    .eq("group_id", args.groupId)
+    .eq("user_id", args.userId)
+    .select("group_id, user_id, role")
+    .single();
+
+  if (error) throw error;
+  if (!updated || updated.role !== nextRole) {
+    throw new Error("Moderator update did not persist.");
+  }
+  return updated;
+}
+
 export async function removeMemberFromCommunity(args: {
   groupId: string;
   userId: string;
@@ -11,13 +33,17 @@ export async function removeMemberFromCommunity(args: {
   const reason = String(args.reason || "").trim();
   if (!reason) throw new Error("Removal reason is required.");
 
-  const { error: deleteError } = await supabase
+  const { data: deletedRows, error: deleteError } = await supabase
     .from("group_members")
     .delete()
     .eq("group_id", args.groupId)
-    .eq("user_id", args.userId);
+    .eq("user_id", args.userId)
+    .select("group_id, user_id");
 
   if (deleteError) throw deleteError;
+  if (!deletedRows || !deletedRows.length) {
+    throw new Error("Member was not removed from the group.");
+  }
 
   const { error: profileError } = await supabase
     .from("profiles")
