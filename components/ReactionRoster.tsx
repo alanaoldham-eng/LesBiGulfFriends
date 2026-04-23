@@ -32,12 +32,7 @@ export function ReactionRoster({
       onMouseEnter={() => uniquePeople.length && setOpen(true)}
       onMouseLeave={() => setOpen(false)}
     >
-      <button
-        type="button"
-        style={buttonStyle}
-        onClick={onReact}
-        aria-label={`React with ${emoji}`}
-      >
+      <button type="button" style={buttonStyle} onClick={onReact} aria-label={`React with ${emoji}`}>
         {emoji} {reactions?.length || ""}
       </button>
 
@@ -54,7 +49,7 @@ export function ReactionRoster({
             borderRadius: 12,
             boxShadow: "0 10px 24px rgba(57,30,45,0.18)",
             padding: 10,
-            zIndex: 30,
+            zIndex: 999,
           }}
         >
           <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>

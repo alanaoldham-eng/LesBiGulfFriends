@@ -5,6 +5,18 @@ import { useEffect, useState } from "react";
 import { ClientShell } from "../../components/ClientShell";
 import { getCurrentUser } from "../../lib/auth";
 import { createInvite, listMyInvites, getMyProfile } from "../../lib/db";
+import { supabase } from "../../lib/supabase/client";
+
+const tinyBtn: React.CSSProperties = {
+  padding: "6px 8px",
+  borderRadius: 10,
+  border: "1px solid #f1dfe8",
+  background: "#fff",
+  fontSize: 12,
+  lineHeight: 1.1,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+};
 
 export default function InvitesPage() {
   const [me, setMe] = useState("");
@@ -34,7 +46,7 @@ export default function InvitesPage() {
     run();
   }, []);
 
-  const sendInviteEmail = async (inviteId: string, inviteeEmail: string) => {
+  const sendInviteEmail = async (inviteeEmail: string) => {
     const res = await fetch("/api/invites/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -48,7 +60,7 @@ export default function InvitesPage() {
     if (!email.trim()) return;
     try {
       const invite = await createInvite(me, email.trim());
-      const sendResult = await sendInviteEmail(invite.id, email.trim());
+      const sendResult = await sendInviteEmail(email.trim());
 
       if (!sendResult.ok) {
         const { updateInviteStatus } = await import("../../lib/db");
@@ -70,7 +82,7 @@ export default function InvitesPage() {
   const retryInvite = async (inviteId: string, inviteeEmail: string) => {
     try {
       setStatus("Retrying invite...");
-      const sendResult = await sendInviteEmail(inviteId, inviteeEmail);
+      const sendResult = await sendInviteEmail(inviteeEmail);
       const { updateInviteStatus } = await import("../../lib/db");
       if (!sendResult.ok) {
         await updateInviteStatus(inviteId, "failed", null, sendResult.error || "Unable to send email", null);
@@ -82,6 +94,17 @@ export default function InvitesPage() {
       await refresh(me);
     } catch (e: any) {
       setStatus(e.message || "Retry failed.");
+    }
+  };
+
+  const deleteInvite = async (inviteId: string) => {
+    try {
+      const { error } = await supabase.from("invites").delete().eq("id", inviteId).eq("inviter_id", me);
+      if (error) throw error;
+      setStatus("Invite deleted.");
+      await refresh(me);
+    } catch (e: any) {
+      setStatus(e.message || "Unable to delete invite.");
     }
   };
 
@@ -145,11 +168,12 @@ export default function InvitesPage() {
                 {inv.intro_rewarded_at ? <span style={{ opacity: 0.75, fontSize: 13 }}>Intro reward earned</span> : null}
               </div>
               {inv.error_message ? <div style={{ opacity: 0.7, marginTop: 6 }}>Error: {inv.error_message}</div> : null}
-              {(inv.status === "failed" || inv.status === "pending") ? (
-                <div style={{ marginTop: 8 }}>
-                  <button className="button secondary" onClick={() => retryInvite(inv.id, inv.invitee_email)}>Retry send</button>
-                </div>
-              ) : null}
+              <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {(inv.status === "failed" || inv.status === "pending") ? (
+                  <button style={tinyBtn} onClick={() => retryInvite(inv.id, inv.invitee_email)}>Retry send</button>
+                ) : null}
+                <button style={tinyBtn} onClick={() => deleteInvite(inv.id)}>Delete Invite</button>
+              </div>
             </div>
           )) : <p style={{ margin: 0, opacity: 0.8 }}>No invites yet.</p>}
         </section>

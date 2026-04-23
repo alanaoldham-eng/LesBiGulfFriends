@@ -1,23 +1,10 @@
-Groups reactions:
-Use the new `components/ReactionRoster.tsx` in your groups page anywhere emoji reactions are shown.
+Events:
+- This package overwrites your uploaded app/events-app/page.tsx with safe targeted changes if the upload was present.
+- If your local events page differs from the uploaded one, compare before overwrite.
 
-Pattern:
+Groups:
+- Use components/ReactionRoster.tsx for emoji hover rosters.
+- Replace plain emoji buttons with the ReactionRoster component in your group thread page if needed.
 
-import { ReactionRoster } from "../../components/ReactionRoster";
-
-const grouped = new Map<string, any[]>();
-(message.reactions || []).forEach((r: any) => {
-  grouped.set(r.emoji, [...(grouped.get(r.emoji) || []), r]);
-});
-
-{EMOJIS.map((emoji) => (
-  <ReactionRoster
-    key={emoji}
-    emoji={emoji}
-    reactions={grouped.get(emoji) || []}
-    onReact={() => onReact(message.id, emoji)}
-    buttonStyle={REACT_SMALL}
-  />
-))}
-
-This gives you a hover popover with linked usernames instead of a plain title tooltip.
+Schema context used:
+The app has `invites`, `event_media`, `event_media_comments`, `event_media_reactions`, `event_message_reactions`, `group_message_reactions`, and `messages` tables in the uploaded schema. fileciteturn101file0
