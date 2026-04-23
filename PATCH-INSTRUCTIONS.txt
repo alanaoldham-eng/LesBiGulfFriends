@@ -1,25 +1,23 @@
-This package gives you the stable missing shared infrastructure.
+Groups reactions:
+Use the new `components/ReactionRoster.tsx` in your groups page anywhere emoji reactions are shown.
 
-Still patch these two app-specific areas in your repo:
+Pattern:
 
-1. app/events-app/page.tsx
-- Use `lib/eventMedia.ts` for gallery comments/reactions.
-- Render video with an explicit source tag:
+import { ReactionRoster } from "../../components/ReactionRoster";
 
-<video controls playsInline preload="metadata" style={{ width: "100%", borderRadius: 12, background: "#000" }}>
-  <source src={item.media_url} type={item.media_type || "video/mp4"} />
-</video>
+const grouped = new Map<string, any[]>();
+(message.reactions || []).forEach((r: any) => {
+  grouped.set(r.emoji, [...(grouped.get(r.emoji) || []), r]);
+});
 
-- Gate "Check in to Event" so it only appears after the event has started.
-- Gate "Upload to event gallery" so it only appears after the event has started.
-- Keep create-event form collapsed until the user clicks a Create Event CTA.
-- Show Create Event CTA whenever the user has at least 1 karma.
-- Prevent duplicate event badges by checking existing badges before awarding.
+{EMOJIS.map((emoji) => (
+  <ReactionRoster
+    key={emoji}
+    emoji={emoji}
+    reactions={grouped.get(emoji) || []}
+    onReact={() => onReact(message.id, emoji)}
+    buttonStyle={REACT_SMALL}
+  />
+))}
 
-2. Invite logic / signup flow
-- Update signup so invited email addresses bypass waiting-room creation.
-- I did not guess your exact invite table name because your repo drifted and that is the part most likely to break if guessed incorrectly.
-
-3. Groups reactions
-- Use the same hover-name technique as event media/message reactions:
-  create a tooltip or popover containing links to the profiles of users who reacted.
+This gives you a hover popover with linked usernames instead of a plain title tooltip.
