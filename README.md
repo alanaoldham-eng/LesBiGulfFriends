@@ -1,12 +1,7 @@
-# v080 patch
+# v081 patch
 
 Apply:
-1. Unzip into repo root and overwrite files
-2. Run `npm run build`
-
-Included:
-- app/invites/page.tsx
-- app/messages/page.tsx
-- app/events-app/page.tsx
-- components/ReactionRoster.tsx
-- PATCH-INSTRUCTIONS.txt
+1. Run `sql/v081_moderation_uploads.sql` in Supabase.
+2. Unzip into repo root and overwrite files.
+3. Read `PATCH-INSTRUCTIONS.md` for Events and Groups integration.
+4. Run `npm run build`.

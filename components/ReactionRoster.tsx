@@ -1,21 +1,12 @@
 "use client";
-
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
-export function ReactionRoster({
-  emoji,
-  reactions,
-  onReact,
-  buttonStyle,
-}: {
-  emoji: string;
-  reactions: any[];
-  onReact: () => void;
-  buttonStyle?: React.CSSProperties;
-}) {
+export function ReactionRoster({ emoji, reactions, onReact, buttonStyle }: { emoji: string; reactions: any[]; onReact: () => void; buttonStyle?: React.CSSProperties; }) {
+  const anchorRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
-
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
   const uniquePeople = useMemo(() => {
     const seen = new Set<string>();
     return (reactions || []).filter((r: any) => {
@@ -25,48 +16,20 @@ export function ReactionRoster({
       return true;
     });
   }, [reactions]);
-
+  const show = () => {
+    if (!uniquePeople.length || !anchorRef.current) return;
+    const rect = anchorRef.current.getBoundingClientRect();
+    setCoords({ top: rect.top - 8, left: rect.left });
+    setOpen(true);
+  };
   return (
-    <div
-      style={{ position: "relative", display: "inline-block" }}
-      onMouseEnter={() => uniquePeople.length && setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-    >
-      <button type="button" style={buttonStyle} onClick={onReact} aria-label={`React with ${emoji}`}>
-        {emoji} {reactions?.length || ""}
-      </button>
-
-      {open ? (
-        <div
-          style={{
-            position: "absolute",
-            bottom: "calc(100% + 6px)",
-            left: 0,
-            minWidth: 180,
-            maxWidth: 260,
-            background: "#fff",
-            border: "1px solid #ead5df",
-            borderRadius: 12,
-            boxShadow: "0 10px 24px rgba(57,30,45,0.18)",
-            padding: 10,
-            zIndex: 999,
-          }}
-        >
-          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
-            Reacted with {emoji}
-          </div>
-          <div style={{ display: "grid", gap: 6 }}>
-            {uniquePeople.map((r: any) => (
-              <Link
-                key={r.user_id}
-                href={`/members/${r.user_id}`}
-                style={{ color: "#8d2d5d", textDecoration: "none", fontWeight: 600 }}
-              >
-                {r.profile?.display_name || r.user_id}
-              </Link>
-            ))}
-          </div>
-        </div>
+    <div ref={anchorRef} style={{ position: "relative", display: "inline-block" }} onMouseEnter={show} onMouseLeave={() => setOpen(false)}>
+      <button type="button" style={buttonStyle} onClick={onReact}>{emoji} {reactions?.length || ""}</button>
+      {open && typeof document !== "undefined" ? createPortal(
+        <div onMouseEnter={show} onMouseLeave={() => setOpen(false)} style={{ position: "fixed", top: coords.top, left: coords.left, transform: "translateY(-100%)", minWidth: 180, maxWidth: 260, background: "#fff", border: "1px solid #ead5df", borderRadius: 12, boxShadow: "0 10px 24px rgba(57,30,45,0.18)", padding: 10, zIndex: 10001 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Reacted with {emoji}</div>
+          <div style={{ display: "grid", gap: 6 }}>{uniquePeople.map((r: any) => <Link key={r.user_id} href={`/members/${r.user_id}`} style={{ color: "#8d2d5d", textDecoration: "none", fontWeight: 600 }}>{r.profile?.display_name || r.user_id}</Link>)}</div>
+        </div>, document.body
       ) : null}
     </div>
   );
