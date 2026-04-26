@@ -1,7 +1,12 @@
-# v081 patch
+# v081 Interactive Pages Patch
 
-Apply:
-1. Run `sql/v081_moderation_uploads.sql` in Supabase.
-2. Unzip into repo root and overwrite files.
-3. Read `PATCH-INSTRUCTIONS.md` for Events and Groups integration.
-4. Run `npm run build`.
+This zip contains the complete patched files:
+
+- app/groups-app/[groupId]/page.tsx
+- app/events-app/page.tsx
+
+Unzip into your repo root and overwrite those files.
+
+Then run:
+
+npm run build

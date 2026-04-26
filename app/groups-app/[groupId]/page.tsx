@@ -1,31 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ClientShell } from "../../../components/ClientShell";
+import { ReactionRoster } from "../../../components/ReactionRoster";
+import { StatusModal } from "../../../components/StatusModal";
+import { DeleteReasonModal } from "../../../components/DeleteReasonModal";
 import { getCurrentUser } from "../../../lib/auth";
-import { createCommunityGroup } from "../../../lib/community";
-import { editGroupMessageByAuthor } from "../../../lib/messageEditing";
-import { removeMemberFromCommunity, setGroupModeratorStatus } from "../../../lib/moderation";
 import {
-  getFriendIds,
   getGroupById,
   getMyGroupMembership,
-  getMyProfile,
-  getPublicAndMemberGroups,
-  isProfileComplete,
   listGroupMembers,
-  reactToGroupMessage,
-  sendFriendRequest,
+  removeGroupMember,
   sendGroupReply,
   updateGroupMemberRole,
   uploadPublicImage,
+  getFriendIds,
+  sendFriendRequest,
+  reactToGroupMessage,
+  getMyProfile,
+  getPublicAndMemberGroups,
+  isProfileComplete,
 } from "../../../lib/db";
 import { listGroupMessagesDetailedUnlimited } from "../../../lib/groupMessagesDetailed";
-
-const EMOJIS = ["❤️", "👍", "😂", "🔥", "👏"];
-const PAGE_SIZE = 10;
+import { createCommunityGroup } from "../../../lib/community";
+import { editGroupMessageByAuthor } from "../../../lib/messageEditing";
+import { softRemoveContent } from "../../../lib/contentModeration";
 
 const compactBtn: React.CSSProperties = {
   padding: "6px 8px",
@@ -37,6 +38,19 @@ const compactBtn: React.CSSProperties = {
   cursor: "pointer",
   whiteSpace: "nowrap",
 };
+
+async function sendFriendRequestEmailNotification(recipientUserId: string, requesterName: string) {
+  try {
+    await fetch("/api/notifications/friend-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipientUserId, requesterName }),
+    });
+  } catch {}
+}
+
+const EMOJIS = ["❤️", "👍", "😂", "🔥", "👏"];
+const PAGE_SIZE = 10;
 
 function formatKarma(value: any) {
   const num = Number(value || 0);
@@ -64,72 +78,36 @@ function MessageCard({
   editingId,
   editingBody,
   setEditingBody,
+  canModerate,
+  onRemoveContent,
 }: any) {
   const mainPhoto = m.profile?.photo_urls?.[0] || m.profile?.photo_url || null;
   const isFriend = friendIds.has(m.sender_id);
-  const grouped = new Map<string, number>();
-  (m.reactions || []).forEach((r: any) => grouped.set(r.emoji, (grouped.get(r.emoji) || 0) + 1));
+  const grouped = new Map<string, any[]>();
+  (m.reactions || []).forEach((r: any) => grouped.set(r.emoji, [...(grouped.get(r.emoji) || []), r]));
   const isOpen = openReplyId === String(m.id);
   const isEditing = editingId === String(m.id);
 
   return (
-    <div
-      style={{
-        marginBottom: 14,
-        paddingLeft: m.parent_message_id ? 20 : 0,
-        borderLeft: m.parent_message_id ? "3px solid #f1dfe8" : "none",
-      }}
-    >
+    <div style={{ marginBottom: 14, paddingLeft: m.parent_message_id ? 20 : 0, borderLeft: m.parent_message_id ? "3px solid #f1dfe8" : "none" }}>
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-        {mainPhoto ? (
-          <img
-            src={mainPhoto}
-            alt={m.profile?.display_name || "Member"}
-            style={{ width: 38, height: 38, borderRadius: 999, objectFit: "cover", border: "1px solid #ead5df" }}
-          />
-        ) : null}
+        {mainPhoto ? <img src={mainPhoto} alt={m.profile?.display_name || "Member"} style={{ width: 38, height: 38, borderRadius: 999, objectFit: "cover", border: "1px solid #ead5df" }} /> : null}
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <Link href={`/members/${m.sender_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>
               {m.sender_id === me ? "You" : m.profile?.display_name || m.sender_id}
             </Link>
-            {m.sender_id !== me && !isFriend ? (
-              <button style={compactBtn} onClick={() => onAddFriend(m.sender_id)}>
-                Add Friend
-              </button>
-            ) : null}
-            {m.sender_id === me ? (
-              <button style={compactBtn} onClick={() => onEditStart(m)}>
-                Edit
-              </button>
-            ) : null}
+            {m.sender_id !== me && !isFriend ? <button className="button secondary" onClick={() => onAddFriend(m.sender_id)}>Add Friend</button> : null}
+            {m.sender_id === me ? <button className="button secondary" onClick={() => onEditStart(m)}>Edit</button> : null}
             {m.edited_at ? <span style={{ opacity: 0.55, fontSize: 12 }}>edited</span> : null}
           </div>
 
           {isEditing ? (
-            <div
-              style={{
-                marginTop: 10,
-                display: "grid",
-                gap: 10,
-                border: "1px solid #f1dfe8",
-                borderRadius: 14,
-                padding: 10,
-                background: "#fffafc",
-              }}
-            >
-              <textarea
-                value={editingBody}
-                onChange={(e) => setEditingBody(e.target.value)}
-                style={{ minHeight: 90, padding: "12px 14px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 15 }}
-              />
+            <div style={{ marginTop: 10, display: "grid", gap: 10, border: "1px solid #f1dfe8", borderRadius: 14, padding: 10, background: "#fffafc" }}>
+              <textarea value={editingBody} onChange={(e) => setEditingBody(e.target.value)} style={{ minHeight: 90, padding: "12px 14px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 15 }} />
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button className="button" onClick={() => onEditSave(m.id)}>
-                  Save edit
-                </button>
-                <button className="button secondary" onClick={onEditCancel}>
-                  Cancel
-                </button>
+                <button className="button" onClick={() => onEditSave(m.id)}>Save edit</button>
+                <button className="button secondary" onClick={onEditCancel}>Cancel</button>
               </div>
             </div>
           ) : (
@@ -145,11 +123,7 @@ function MessageCard({
               {m.media_url ? (
                 <div style={{ marginTop: 8 }}>
                   {String(m.media_type || "").startsWith("image/") ? (
-                    <img
-                      src={m.media_url}
-                      alt="Attachment"
-                      style={{ maxWidth: "100%", borderRadius: 14, border: "1px solid #ead5df" }}
-                    />
+                    <img src={m.media_url} alt="Attachment" style={{ maxWidth: "100%", borderRadius: 14, border: "1px solid #ead5df" }} />
                   ) : (
                     <a href={m.media_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>
                       Open attachment
@@ -160,49 +134,32 @@ function MessageCard({
             </>
           )}
 
-          <div style={{ display: "flex", gap: 6, flexWrap: "nowrap", marginTop: 8, overflowX: "auto" }}>
-            <button type="button" style={compactBtn} onClick={() => onReplyStart(String(m.id))}>
-              Reply
-            </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+            <button type="button" className="button secondary" onClick={() => onReplyStart(String(m.id))}>Reply</button>
             {EMOJIS.map((emoji) => (
-              <button key={emoji} style={compactBtn} onClick={() => onReact(m.id, emoji)}>
-                {emoji} {grouped.get(emoji) || ""}
-              </button>
+              <ReactionRoster
+                key={emoji}
+                emoji={emoji}
+                reactions={grouped.get(emoji) || []}
+                onReact={() => onReact(m.id, emoji)}
+                buttonStyle={compactBtn}
+              />
             ))}
+            {m.media_url && (canModerate || m.sender_id === me) ? (
+              <button type="button" style={compactBtn} onClick={() => onRemoveContent(String(m.id))} title="Remove content">
+                🗑
+              </button>
+            ) : null}
           </div>
 
           {isOpen ? (
-            <div
-              style={{
-                marginTop: 10,
-                display: "grid",
-                gap: 10,
-                border: "1px solid #f1dfe8",
-                borderRadius: 14,
-                padding: 10,
-                background: "#fffafc",
-              }}
-            >
-              <textarea
-                value={draftReply}
-                onChange={(e) => setDraftReply(e.target.value)}
-                placeholder="Reply here"
-                style={{ minHeight: 90, padding: "12px 14px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 15 }}
-              />
-              <input
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                placeholder="Optional link"
-                style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 14 }}
-              />
+            <div style={{ marginTop: 10, display: "grid", gap: 10, border: "1px solid #f1dfe8", borderRadius: 14, padding: 10, background: "#fffafc" }}>
+              <textarea value={draftReply} onChange={(e) => setDraftReply(e.target.value)} placeholder="Reply here" style={{ minHeight: 90, padding: "12px 14px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 15 }} />
+              <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="Optional link" style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 14 }} />
               <input type="file" accept="image/*,.pdf,.doc,.docx,.txt,.zip" onChange={(e) => setAttachment(e.target.files?.[0] || null)} />
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button className="button" onClick={() => onReplySend(String(m.id))}>
-                  Send reply
-                </button>
-                <button className="button secondary" onClick={onReplyCancel}>
-                  Cancel
-                </button>
+                <button className="button" onClick={() => onReplySend(String(m.id))}>Send reply</button>
+                <button className="button secondary" onClick={onReplyCancel}>Cancel</button>
               </div>
             </div>
           ) : null}
@@ -230,6 +187,8 @@ function MessageCard({
                 editingId={editingId}
                 editingBody={editingBody}
                 setEditingBody={setEditingBody}
+                canModerate={canModerate}
+                onRemoveContent={onRemoveContent}
               />
             </div>
           ))}
@@ -258,6 +217,7 @@ export default function GroupThreadPage() {
   const [replyLinkUrl, setReplyLinkUrl] = useState("");
   const [replyAttachment, setReplyAttachment] = useState<File | null>(null);
   const [status, setStatus] = useState("");
+  const [myName, setMyName] = useState("A member");
   const [myKarma, setMyKarma] = useState(0);
   const [allGroups, setAllGroups] = useState<any[]>([]);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
@@ -268,6 +228,7 @@ export default function GroupThreadPage() {
   const [newGroupPrivate, setNewGroupPrivate] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingMessageBody, setEditingMessageBody] = useState("");
+  const [deleteTargetMessageId, setDeleteTargetMessageId] = useState<string | null>(null);
 
   const canModerate = membership?.role === "owner" || membership?.role === "mod";
   const isOwner = membership?.role === "owner";
@@ -287,6 +248,7 @@ export default function GroupThreadPage() {
     setMembers(memberRows);
     setMessages(messageRows);
     setFriendIds(fids);
+    setMyName(myProfile?.display_name || "A member");
     setMyKarma(Number(myProfile?.karma_points || 0));
     setNeedsOnboarding(!isProfileComplete(myProfile));
     setAllGroups(groups);
@@ -304,7 +266,7 @@ export default function GroupThreadPage() {
 
   const messageTree = useMemo(() => {
     const nodes = new Map<string, any>();
-    messages.forEach((m: any) => nodes.set(String(m.id), { ...m, children: [] }));
+    messages.filter((m: any) => m.moderation_status !== "removed").forEach((m: any) => nodes.set(String(m.id), { ...m, children: [] }));
     const roots: any[] = [];
     nodes.forEach((node: any) => {
       const parentId = node.parent_message_id ? String(node.parent_message_id) : null;
@@ -376,7 +338,10 @@ export default function GroupThreadPage() {
     try {
       const result: any = await sendFriendRequest(me, userId);
       setStatus(result?.duplicate ? "Friend request already pending." : "Friend request sent.");
-      if (!result?.duplicate) setFriendIds(new Set<string>([...Array.from(friendIds), userId]));
+      if (!result?.duplicate) {
+        setFriendIds(new Set<string>([...Array.from(friendIds), userId]));
+        await sendFriendRequestEmailNotification(userId, myName);
+      }
     } catch (e: any) {
       setStatus(e.message || "Unable to send friend request.");
     }
@@ -389,6 +354,18 @@ export default function GroupThreadPage() {
       await refresh(me);
     } catch (e: any) {
       setStatus(e.message || "Unable to react to message.");
+    }
+  };
+
+  const removeContent = async (reason: string) => {
+    if (!deleteTargetMessageId) return;
+    try {
+      await softRemoveContent("group_messages", deleteTargetMessageId, reason);
+      setDeleteTargetMessageId(null);
+      setStatus("Content removed from the website and logged.");
+      await refresh(me);
+    } catch (e: any) {
+      setStatus(e.message || "Unable to remove content.");
     }
   };
 
@@ -411,37 +388,7 @@ export default function GroupThreadPage() {
     }
   };
 
-  const toggleMod = async (userId: string, currentlyMod: boolean) => {
-    try {
-      await setGroupModeratorStatus({ groupId, userId, makeModerator: !currentlyMod });
-      setStatus(currentlyMod ? "Moderator privileges removed." : "Moderator privileges granted.");
-      await refresh(me);
-    } catch (e: any) {
-      setStatus(e.message || "Unable to update moderator status.");
-    }
-  };
-
-  const removeMember = async (userId: string) => {
-    const reason = window.prompt("Why are you removing this member? This reason will be saved to their record.");
-    if (!reason || !reason.trim()) return;
-    try {
-      await removeMemberFromCommunity({
-        groupId,
-        userId,
-        removedBy: me,
-        reason,
-      });
-      setStatus("Member removed.");
-      await refresh(me);
-    } catch (e: any) {
-      setStatus(e.message || "Unable to remove member.");
-    }
-  };
-
-  const postPlaceholder =
-    String(group?.name || "").toLowerCase() === "main"
-      ? "Introduce yourself to the Main group"
-      : `Post to ${group?.name || "group"}`;
+  const postPlaceholder = String(group?.name || "").toLowerCase() === "main" ? "Introduce yourself to the Main group" : `Post to ${group?.name || "group"}`;
 
   return (
     <ClientShell>
@@ -454,57 +401,22 @@ export default function GroupThreadPage() {
         {needsOnboarding ? (
           <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff7fb" }}>
             <h3 style={{ marginTop: 0 }}>Finish your profile first</h3>
-            <button className="button" onClick={() => router.push("/onboarding/profile")}>
-              Complete profile
-            </button>
+            <button className="button" onClick={() => router.push("/onboarding/profile")}>Complete profile</button>
           </section>
         ) : null}
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <h3 style={{ marginTop: 0 }}>Groups</h3>
           <div style={{ display: "grid", gap: 8 }}>
-            {allGroups.map((g: any) => (
-              <Link key={g.id} className="button secondary" href={`/groups-app/${g.id}`}>
-                {String(g.name || "").toLowerCase() === "main" ? "⭐ Main" : g.name}
-              </Link>
-            ))}
-            {myKarma >= 1 ? (
-              <button className="button" onClick={() => setCreateGroupOpen((v) => !v)}>
-                {createGroupOpen ? "Close Create Group" : "Create Group"}
-              </button>
-            ) : null}
+            {allGroups.map((g: any) => <Link key={g.id} className="button secondary" href={`/groups-app/${g.id}`}>{String(g.name || "").toLowerCase() === "main" ? "⭐ Main" : g.name}</Link>)}
+            {myKarma >= 1 ? <button className="button" onClick={() => setCreateGroupOpen((v) => !v)}>{createGroupOpen ? "Close Create Group" : "Create Group"}</button> : null}
           </div>
           {createGroupOpen ? (
-            <div
-              style={{
-                marginTop: 12,
-                display: "grid",
-                gap: 10,
-                border: "1px solid #f1dfe8",
-                borderRadius: 16,
-                padding: 12,
-                background: "#fffafc",
-              }}
-            >
-              <input
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                placeholder="Group name"
-                style={{ padding: "12px 14px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 15 }}
-              />
-              <textarea
-                value={newGroupDescription}
-                onChange={(e) => setNewGroupDescription(e.target.value)}
-                placeholder="Group description"
-                style={{ minHeight: 90, padding: "12px 14px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 15 }}
-              />
-              <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <input type="checkbox" checked={newGroupPrivate} onChange={(e) => setNewGroupPrivate(e.target.checked)} />
-                <span>Private group</span>
-              </label>
-              <button className="button" onClick={createGroup}>
-                Create this group
-              </button>
+            <div style={{ marginTop: 12, display: "grid", gap: 10, border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, background: "#fffafc" }}>
+              <input value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="Group name" style={{ padding: "12px 14px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 15 }} />
+              <textarea value={newGroupDescription} onChange={(e) => setNewGroupDescription(e.target.value)} placeholder="Group description" style={{ minHeight: 90, padding: "12px 14px", borderRadius: 12, border: "1px solid #d7a8bf", fontSize: 15 }} />
+              <label style={{ display: "flex", gap: 10, alignItems: "center" }}><input type="checkbox" checked={newGroupPrivate} onChange={(e) => setNewGroupPrivate(e.target.checked)} /><span>Private group</span></label>
+              <button className="button" onClick={createGroup}>Create this group</button>
             </div>
           ) : null}
         </section>
@@ -512,143 +424,86 @@ export default function GroupThreadPage() {
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <h3 style={{ marginTop: 0 }}>New post</h3>
           <div style={{ display: "grid", gap: 12 }}>
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder={postPlaceholder}
-              style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
-            />
-            <input
-              value={linkUrl}
-              onChange={(e) => setLinkUrl(e.target.value)}
-              placeholder="Optional link"
-              style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
-            />
+            <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder={postPlaceholder} style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+            <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="Optional link" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
             <input type="file" accept="image/*,.pdf,.doc,.docx,.txt,.zip" onChange={(e) => setAttachment(e.target.files?.[0] || null)} />
-            <button className="button" onClick={send}>
-              Send to group
-            </button>
+            <button className="button" onClick={send}>Send to group</button>
           </div>
         </section>
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <h3 style={{ margin: 0 }}>Threads</h3>
-            <div style={{ opacity: 0.75 }}>
-              {Math.min(visibleCount, messageTree.length)} of {messageTree.length} shown
-            </div>
+            <div style={{ opacity: 0.75 }}>{Math.min(visibleCount, messageTree.length)} of {messageTree.length} shown</div>
           </div>
-          <div
-            style={{
-              border: "1px solid #f1dfe8",
-              borderRadius: 16,
-              padding: 12,
-              minHeight: 220,
-              background: "#fffafc",
-              marginTop: 10,
-            }}
-          >
-            {visibleRoots.length ? (
-              visibleRoots.map((m: any) => (
-                <MessageCard
-                  key={m.id}
-                  m={m}
-                  me={me}
-                  friendIds={friendIds}
-                  onAddFriend={addFriend}
-                  onReplyStart={setReplyTo}
-                  onReplyCancel={() => {
-                    setReplyTo(null);
-                    setReplyBody("");
-                    setReplyLinkUrl("");
-                    setReplyAttachment(null);
-                  }}
-                  onReplySend={sendReply}
-                  onReact={react}
-                  openReplyId={replyTo}
-                  draftReply={replyBody}
-                  setDraftReply={setReplyBody}
-                  setAttachment={setReplyAttachment}
-                  linkUrl={replyLinkUrl}
-                  setLinkUrl={setReplyLinkUrl}
-                  onEditStart={(msg: any) => {
-                    setEditingMessageId(String(msg.id));
-                    setEditingMessageBody(msg.body || "");
-                  }}
-                  onEditSave={saveEdit}
-                  onEditCancel={() => {
-                    setEditingMessageId(null);
-                    setEditingMessageBody("");
-                  }}
-                  editingId={editingMessageId}
-                  editingBody={editingMessageBody}
-                  setEditingBody={setEditingMessageBody}
-                />
-              ))
-            ) : (
-              <p style={{ margin: 0, opacity: 0.7 }}>No group messages yet.</p>
-            )}
+          <div style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, minHeight: 220, background: "#fffafc", marginTop: 10 }}>
+            {visibleRoots.length ? visibleRoots.map((m) => (
+              <MessageCard
+                key={m.id}
+                m={m}
+                me={me}
+                friendIds={friendIds}
+                onAddFriend={addFriend}
+                onReplyStart={setReplyTo}
+                onReplyCancel={() => {
+                  setReplyTo(null);
+                  setReplyBody("");
+                  setReplyLinkUrl("");
+                  setReplyAttachment(null);
+                }}
+                onReplySend={sendReply}
+                onReact={react}
+                openReplyId={replyTo}
+                draftReply={replyBody}
+                setDraftReply={setReplyBody}
+                setAttachment={setReplyAttachment}
+                linkUrl={replyLinkUrl}
+                setLinkUrl={setReplyLinkUrl}
+                onEditStart={(msg: any) => {
+                  setEditingMessageId(String(msg.id));
+                  setEditingMessageBody(msg.body || "");
+                }}
+                onEditSave={saveEdit}
+                onEditCancel={() => {
+                  setEditingMessageId(null);
+                  setEditingMessageBody("");
+                }}
+                editingId={editingMessageId}
+                editingBody={editingMessageBody}
+                setEditingBody={setEditingMessageBody}
+                canModerate={canModerate}
+                onRemoveContent={setDeleteTargetMessageId}
+              />
+            )) : <p style={{ margin: 0, opacity: 0.7 }}>No group messages yet.</p>}
           </div>
-          {visibleCount < messageTree.length ? (
-            <div style={{ marginTop: 12 }}>
-              <button className="button secondary" onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}>
-                Read more
-              </button>
-            </div>
-          ) : null}
+          {visibleCount < messageTree.length ? <div style={{ marginTop: 12 }}><button className="button secondary" onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}>Read more</button></div> : null}
         </section>
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <h3 style={{ marginTop: 0 }}>Member karma standings</h3>
           <p style={{ marginTop: 0, opacity: 0.8 }}>All group members are listed below in descending karma order.</p>
-          {members.map((m: any, index: number) => {
-            const currentlyMod = m.role === "mod";
-            const canShowModButton = isOwner && m.user_id !== me;
-            const canShowRemoveButton = canModerate && m.user_id !== me;
-            return (
-              <div key={m.user_id} style={{ borderBottom: "1px solid #f1dfe8", padding: "10px 0" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    {m.profile?.photo_urls?.[0] || m.profile?.photo_url ? (
-                      <img
-                        src={m.profile?.photo_urls?.[0] || m.profile?.photo_url}
-                        alt={m.profile?.display_name || m.user_id}
-                        style={{ width: 36, height: 36, borderRadius: 999, objectFit: "cover" }}
-                      />
-                    ) : null}
-                    <div>
-                      <div style={{ fontSize: 12, opacity: 0.65 }}>#{index + 1}</div>
-                      <Link href={`/members/${m.user_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>
-                        {m.profile?.display_name || m.user_id}
-                      </Link>
-                      <div style={{ opacity: 0.75 }}>
-                        {m.role} • {formatKarma(m.profile?.karma_points)} karma
-                      </div>
-                    </div>
-                  </div>
-                  {canShowModButton || canShowRemoveButton ? (
-                    <div style={{ display: "flex", gap: 6, flexWrap: "nowrap", overflowX: "auto" }}>
-                      {canShowModButton ? (
-                        <button style={compactBtn} onClick={() => toggleMod(m.user_id, currentlyMod)}>
-                          {currentlyMod ? "Remove Mod" : "Make Mod"}
-                        </button>
-                      ) : null}
-                      {canShowRemoveButton ? (
-                        <button style={compactBtn} onClick={() => removeMember(m.user_id)}>
-                          Remove
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
+          {members.map((m, index) => (
+            <div key={m.user_id} style={{ borderBottom: "1px solid #f1dfe8", padding: "10px 0" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  {(m.profile?.photo_urls?.[0] || m.profile?.photo_url) ? <img src={m.profile?.photo_urls?.[0] || m.profile?.photo_url} alt={m.profile?.display_name || m.user_id} style={{ width: 36, height: 36, borderRadius: 999, objectFit: "cover" }} /> : null}
+                  <div><div style={{ fontSize: 12, opacity: 0.65 }}>#{index + 1}</div><Link href={`/members/${m.user_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>{m.profile?.display_name || m.user_id}</Link><div style={{ opacity: 0.75 }}>{m.role} • {formatKarma(m.profile?.karma_points)} karma</div></div>
                 </div>
+                {canModerate && m.user_id !== me ? <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{isOwner && m.role === "member" ? <button className="button secondary" onClick={() => updateGroupMemberRole(groupId, m.user_id, "mod").then(() => refresh(me))}>Make mod</button> : null}{isOwner && m.role === "mod" ? <button className="button secondary" onClick={() => updateGroupMemberRole(groupId, m.user_id, "member").then(() => refresh(me))}>Make member</button> : null}{(isOwner || (membership?.role === "mod" && m.role === "member")) ? <button className="button secondary" onClick={() => removeGroupMember(groupId, m.user_id).then(() => refresh(me))}>Remove</button> : null}</div> : null}
               </div>
-            );
-          })}
+            </div>
+          ))}
           {!members.length ? <p style={{ margin: 0, opacity: 0.75 }}>No members yet.</p> : null}
         </section>
-
-        {status ? <p style={{ margin: 0, opacity: 0.8 }}>{status}</p> : null}
       </div>
+
+      <DeleteReasonModal
+        open={!!deleteTargetMessageId}
+        title="Remove group content"
+        onCancel={() => setDeleteTargetMessageId(null)}
+        onConfirm={removeContent}
+      />
+      <StatusModal open={!!status} message={status} onClose={() => setStatus("")} />
     </ClientShell>
   );
 }
