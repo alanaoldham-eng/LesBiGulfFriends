@@ -67,14 +67,15 @@ export async function markNotificationRead(userId: string, notificationId: strin
 export async function listInAppNotifications(userId: string) {
   const notifications: any[] = [];
 
-  const [{ data: readRows }, { data: reqs }, { data: msgs }] = await Promise.all([
+  const [{ data: readRows }, { data: reqs }, { data: msgs }, { data: eventInvites }] = await Promise.all([
     supabase.from("notification_reads").select("notification_id").eq("user_id", userId),
     supabase.from("friend_requests").select("id, from_user, created_at, status").eq("to_user", userId).eq("status", "pending").order("created_at", { ascending: false }).limit(20),
     supabase.from("messages").select("id, sender_id, created_at").eq("recipient_id", userId).order("created_at", { ascending: false }).limit(20),
+    supabase.from("event_invites").select("id, event_id, inviter_id, created_at, sent_at, status").eq("invitee_user_id", userId).order("created_at", { ascending: false }).limit(30),
   ]);
 
   const readSet = new Set((readRows || []).map((r: any) => r.notification_id));
-  const profileIds = [...new Set([...(reqs || []).map((r: any) => r.from_user), ...(msgs || []).map((m: any) => m.sender_id)])];
+  const profileIds = [...new Set([...(reqs || []).map((r: any) => r.from_user), ...(msgs || []).map((m: any) => m.sender_id), ...(eventInvites || []).map((e: any) => e.inviter_id)].filter(Boolean))];
 
   let names = new Map<string, string>();
   if (profileIds.length) {
@@ -82,28 +83,32 @@ export async function listInAppNotifications(userId: string) {
     names = new Map((profiles || []).map((p: any) => [p.id, p.display_name || "A member"]));
   }
 
+  const eventIds = [...new Set((eventInvites || []).map((e: any) => e.event_id).filter(Boolean))];
+  let eventNames = new Map<string, string>();
+  if (eventIds.length) {
+    const { data: events } = await supabase.from("events").select("id, title").in("id", eventIds);
+    eventNames = new Map((events || []).map((e: any) => [e.id, e.title || "an event"]));
+  }
+
   for (const r of reqs || []) {
     const id = `fr-${r.id}`;
-    if (readSet.has(id)) continue;
-    notifications.push({
-      id,
-      type: "friend_request",
-      text: `${names.get(r.from_user) || "A member"} sent you a friend request`,
-      href: "/friends",
-      created_at: r.created_at,
-    });
+    if (!readSet.has(id)) {
+      notifications.push({ id, type: "friend_request", text: `${names.get(r.from_user) || "A member"} sent you a friend request`, href: "/friends", created_at: r.created_at });
+    }
   }
 
   for (const m of msgs || []) {
     const id = `dm-${m.id}`;
-    if (readSet.has(id)) continue;
-    notifications.push({
-      id,
-      type: "private_message",
-      text: `New message from ${names.get(m.sender_id) || "a member"}`,
-      href: `/messages?thread=${encodeURIComponent(m.sender_id)}&notification=${encodeURIComponent(id)}`,
-      created_at: m.created_at,
-    });
+    if (!readSet.has(id)) {
+      notifications.push({ id, type: "private_message", text: `New message from ${names.get(m.sender_id) || "a member"}`, href: `/messages?thread=${encodeURIComponent(m.sender_id)}&notification=${encodeURIComponent(id)}`, created_at: m.created_at });
+    }
+  }
+
+  for (const ev of eventInvites || []) {
+    const id = `event-${ev.id}`;
+    if (!readSet.has(id)) {
+      notifications.push({ id, type: "event_invite", text: `You're invited to ${eventNames.get(ev.event_id) || "an event"}`, href: `/events-app?event=${encodeURIComponent(ev.event_id)}&notification=${encodeURIComponent(id)}`, created_at: ev.sent_at || ev.created_at });
+    }
   }
 
   return notifications.sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, 25);

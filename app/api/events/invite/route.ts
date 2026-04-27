@@ -64,8 +64,8 @@ export async function POST(req: Request) {
 
     let targetIds: string[] = [];
     if (body.mode === "public") {
-      const { data: profiles } = await supabase.from("profiles").select("id");
-      targetIds = (profiles || []).map((p: any) => p.id);
+      const { data: profiles } = await supabase.from("profiles").select("id, membership_status");
+      targetIds = (profiles || []).filter((p: any) => !p.membership_status || p.membership_status === "active").map((p: any) => p.id);
     } else {
       targetIds = body.friendIds || [];
     }
@@ -84,18 +84,18 @@ export async function POST(req: Request) {
 
     for (const userId of targetIds) {
       const email = userMap.get(userId);
-      if (!email) continue;
+      const inviteeEmail = email ? String(email).toLowerCase() : `.local`;
 
       await supabase.from("event_invites").insert({
         event_id: body.eventId,
         inviter_id: body.ownerId,
-        invitee_email: String(email).toLowerCase(),
+        invitee_email: inviteeEmail,
         invitee_user_id: userId,
         status: "sent",
         sent_at: new Date().toISOString(),
       });
 
-      if (settingMap.get(userId)) {
+      if (email && settingMap.get(userId)) {
         await sendEmailIfOptedIn({
           apiKey: resendApiKey,
           fromEmail,
