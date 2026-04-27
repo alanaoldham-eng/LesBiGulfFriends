@@ -352,6 +352,7 @@ export default function EventsAppPage() {
     setEventMedia([]);
     setMediaVisibleCount(3);
     setStatus("");
+    setMediaVisibleCount(3);
     setTimeout(() => { refreshSelectedEventDetails(ev.id); }, 0);
   };
 
@@ -712,8 +713,41 @@ export default function EventsAppPage() {
             <p style={{ opacity: 0.8 }}>{new Date(selectedEvent.starts_at).toLocaleString()} • {selectedEvent.location || "Location TBD"}</p>
 
             {loadingDetails ? <p style={{ opacity: 0.75 }}>Loading event details…</p> : null}
-
             <div style={{ marginTop: 16, borderTop: "1px solid #f1dfe8", paddingTop: 16, display: "grid", gap: 16 }}>
+              <div style={{ borderTop: "1px solid #f1dfe8", paddingTop: 18 }}>
+                <h3 style={{ marginTop: 0 }}>Post to event</h3>
+                <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+                  {replyTo ? <div style={{ opacity: 0.75 }}>Replying to message <code>{replyTo.slice(0, 8)}</code> <button className="button secondary" onClick={() => setReplyTo(null)}>Clear reply</button></div> : null}
+                  <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Type an event message" style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+                  <input value={messageLinkUrl} onChange={(e) => setMessageLinkUrl(e.target.value)} placeholder="Optional link" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+                  <input type="file" accept="image/*,.pdf,.doc,.docx,.txt,.zip" onChange={(e) => setAttachment(e.target.files?.[0] || null)} />
+                  <button className="button" onClick={sendMessage}>Send to event</button>
+                </div>
+
+                <h3 style={{ marginTop: 20 }}>Event thread</h3>
+                <div style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, minHeight: 180, background: "#fffafc" }}>
+                  {eventMessages.length ? eventMessages.map((m: any) => (
+                    <EventMessageCard
+                      key={m.id}
+                      m={m}
+                      me={me}
+                      canReview={canReview}
+                      friendIds={friendIds}
+                      onAddFriend={addFriend}
+                      onReply={setReplyTo}
+                      onReact={reactToMessage}
+                      onEditStart={(msg: any) => { setEditingMessageId(msg.id); setEditingMessageBody(msg.body || ""); }}
+                      isEditing={editingMessageId === m.id}
+                      editBody={editingMessageBody}
+                      setEditBody={setEditingMessageBody}
+                      onEditSave={saveEditMessage}
+                      onEditCancel={() => { setEditingMessageId(null); setEditingMessageBody(""); }}
+                      onRemove={(messageId: string) => setDeleteTarget({ type: "event_messages", id: messageId })}
+                    />
+                  )) : <p style={{ margin: 0, opacity: 0.7 }}>No event messages yet.</p>}
+                </div>
+              </div>
+
               <div>
                 <h4 style={{ marginTop: 0 }}>Event media</h4>
                 {selectedEventStarted ? (
@@ -742,9 +776,7 @@ export default function EventsAppPage() {
                       ))}
                     </div>
                     {activeEventMedia.length > mediaVisibleCount ? (
-                      <div style={{ marginTop: 12 }}>
-                        <button className="button secondary" onClick={() => setMediaVisibleCount((v) => v + 3)}>Load more</button>
-                      </div>
+                      <div style={{ marginTop: 12 }}><button className="button secondary" onClick={() => setMediaVisibleCount((v) => v + 3)}>Load more</button></div>
                     ) : null}
                   </>
                 ) : <p style={{ margin: 0, opacity: 0.75 }}>No event media yet.</p>}
@@ -769,7 +801,6 @@ export default function EventsAppPage() {
                     <input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="friend@example.com" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
                     <button className="button secondary" onClick={inviteSingle} disabled={!inviteEmail.trim()}>Send direct invite email</button>
                   </div>
-
                   <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
                     {eventInvites.length ? eventInvites.map((row: any) => (
                       <div key={row.id} style={{ borderBottom: "1px solid #f1dfe8", padding: "10px 0" }}>
@@ -795,47 +826,6 @@ export default function EventsAppPage() {
                   </div>
                 </div>
               ) : null}
-
-              <div style={{ borderTop: "1px solid #f1dfe8", paddingTop: 18 }}>
-                <h3 style={{ marginTop: 0 }}>Event thread</h3>
-                <div style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, minHeight: 180, background: "#fffafc" }}>
-                  {eventMessages.length ? eventMessages.map((m: any) => (
-                  <EventMessageCard
-                    key={m.id}
-                    m={m}
-                    me={me}
-                    canReview={canReview}
-                    friendIds={friendIds}
-                    onAddFriend={addFriend}
-                    onReply={setReplyTo}
-                    onReact={reactToMessage}
-                    onEditStart={(msg: any) => {
-                      setEditingMessageId(msg.id);
-                      setEditingMessageBody(msg.body || "");
-                    }}
-                    isEditing={editingMessageId === m.id}
-                    editBody={editingMessageBody}
-                    setEditBody={setEditingMessageBody}
-                    onEditSave={saveEditMessage}
-                    onEditCancel={() => {
-                      setEditingMessageId(null);
-                      setEditingMessageBody("");
-                    }}
-                    onRemove={(messageId: string) =>
-                      setDeleteTarget({ type: "event_messages", id: messageId })
-                    }
-                  />
-                  )) : <p style={{ margin: 0, opacity: 0.7 }}>No event messages yet.</p>}
-                </div>
-                
-                <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-                  {replyTo ? <div style={{ opacity: 0.75 }}>Replying to message <code>{replyTo.slice(0, 8)}</code> <button className="button secondary" onClick={() => setReplyTo(null)}>Clear reply</button></div> : null}
-                  <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Type an event message" style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-                  <input value={messageLinkUrl} onChange={(e) => setMessageLinkUrl(e.target.value)} placeholder="Optional link" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-                  <input type="file" accept="image/*,.pdf,.doc,.docx,.txt,.zip" onChange={(e) => setAttachment(e.target.files?.[0] || null)} />
-                  <button className="button" onClick={sendMessage}>Send to event</button>
-                </div>
-              </div>
             </div>
           </section>
         ) : null}

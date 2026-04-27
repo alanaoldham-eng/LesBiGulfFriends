@@ -7,6 +7,7 @@ export async function listEventMediaBundle(eventId: string) {
     .from("event_media")
     .select("*")
     .eq("event_id", eventId)
+    .neq("moderation_status", "removed")
     .order("created_at", { ascending: false });
 
   if (error) throw error;

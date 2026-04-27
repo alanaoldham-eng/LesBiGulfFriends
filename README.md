@@ -1,12 +1,5 @@
-# v081 Interactive Pages Patch
+v082.1 events compile fix
 
-This zip contains the complete patched files:
+This removes one extra closing </div> in app/events-app/page.tsx around the selected event panel.
 
-- app/groups-app/[groupId]/page.tsx
-- app/events-app/page.tsx
-
-Unzip into your repo root and overwrite those files.
-
-Then run:
-
-npm run build
+Apply by unzipping into repo root and overwriting, then run npm run build.

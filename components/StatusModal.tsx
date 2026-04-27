@@ -1,6 +1,6 @@
 "use client";
 
-export function StatusModal({ open, title = "Notice", message, onClose }: { open: boolean; title?: string; message: string; onClose: () => void; }) {
+export function StatusModal({ open, title = "Notice", message, onClose }: { open: boolean; title?: string; message: string; onClose: () => void }) {
   if (!open) return null;
   return (
     <div role="dialog" aria-modal="true" onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(30,20,28,0.45)", display: "grid", placeItems: "center", zIndex: 10000, padding: 16 }}>

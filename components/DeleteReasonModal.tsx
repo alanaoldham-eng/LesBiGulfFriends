@@ -1,7 +1,8 @@
 "use client";
+
 import { useState } from "react";
 
-export function DeleteReasonModal({ open, title = "Remove content", onCancel, onConfirm }: { open: boolean; title?: string; onCancel: () => void; onConfirm: (reason: string) => Promise<void> | void; }) {
+export function DeleteReasonModal({ open, title = "Remove content", onCancel, onConfirm }: { open: boolean; title?: string; onCancel: () => void; onConfirm: (reason: string) => Promise<void> | void }) {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   if (!open) return null;
