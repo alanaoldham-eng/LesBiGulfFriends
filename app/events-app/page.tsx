@@ -427,21 +427,32 @@ export default function EventsAppPage() {
           is_public: isPublic,
         });
 
+        let inviteSummary = "";
         if (isPublic) {
-          await fetch("/api/events/invite", {
+          const inviteResponse = await fetch("/api/events/invite", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ mode: "public", eventId: ev.id, ownerId: me }),
           });
+          const inviteResult = await inviteResponse.json().catch(() => ({}));
+          if (!inviteResponse.ok || inviteResult?.ok === false) {
+            throw new Error(inviteResult?.error || "Event created, but public event notifications failed.");
+          }
+          inviteSummary = ` ${inviteResult.notificationCount || 0} in-app notification${inviteResult.notificationCount === 1 ? "" : "s"} queued.`;
         } else if (selectedFriendIds.length) {
-          await fetch("/api/events/invite", {
+          const inviteResponse = await fetch("/api/events/invite", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ mode: "private", eventId: ev.id, ownerId: me, friendIds: selectedFriendIds }),
           });
+          const inviteResult = await inviteResponse.json().catch(() => ({}));
+          if (!inviteResponse.ok || inviteResult?.ok === false) {
+            throw new Error(inviteResult?.error || "Event created, but private event notifications failed.");
+          }
+          inviteSummary = ` ${inviteResult.notificationCount || 0} in-app notification${inviteResult.notificationCount === 1 ? "" : "s"} queued.`;
         }
 
-        setStatus("Event created.");
+        setStatus(`Event created.${inviteSummary}`);
       }
 
       clearForm();
