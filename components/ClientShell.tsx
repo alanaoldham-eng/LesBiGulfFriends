@@ -64,9 +64,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           .then(setNotifications)
           .catch(() => setNotifications([]));
 
-        const roleFlags = await getViewerRoleFlags(user.id).catch(() => ({
-          canReview: false,
-        }));
+        const roleFlags = await getViewerRoleFlags(user.id).catch(() => ({ canReview: false }));
         setCanReview(!!roleFlags?.canReview);
       } else {
         setNotifications([]);
@@ -106,7 +104,16 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         </button>
 
         {menuOpen ? (
-          <div style={{ ...panelStyle, left: 0, minWidth: 238, display: "grid", gap: 7 }}>
+          <div
+            style={{
+              ...panelStyle,
+              right: 0,
+              minWidth: 238,
+              maxWidth: "calc(100vw - 18px)",
+              display: "grid",
+              gap: 7,
+            }}
+          >
             <Link href="/app" style={menuItemStyle}>Home</Link>
             <Link href="/groups-app" style={menuItemStyle}>Groups</Link>
             <Link href="/messages" style={menuItemStyle}>Messages</Link>

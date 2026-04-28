@@ -14,7 +14,7 @@ async function sendEmailIfOptedIn(args: {
   subject: string;
   html: string;
 }) {
-  if (!args.apiKey) return;
+  if (!args.apiKey || !args.to) return;
 
   await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -55,22 +55,29 @@ export async function POST(req: Request) {
       return Response.json({ ok: false, error: eventError.message }, { status: 400 });
     }
 
-    const { data: existingInvites } = await supabase
-      .from("event_invites")
-      .select("invitee_user_id")
-      .eq("event_id", body.eventId);
-
-    const existingIds = new Set((existingInvites || []).map((x: any) => x.invitee_user_id).filter(Boolean));
-
     let targetIds: string[] = [];
+
     if (body.mode === "public") {
-      const { data: profiles } = await supabase.from("profiles").select("id, membership_status");
-      targetIds = (profiles || []).filter((p: any) => !p.membership_status || p.membership_status === "active").map((p: any) => p.id);
+      const { data: profiles, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, membership_status");
+
+      if (profileError) {
+        return Response.json({ ok: false, error: profileError.message }, { status: 400 });
+      }
+
+      targetIds = (profiles || [])
+        .filter((p: any) => !p.membership_status || p.membership_status === "active")
+        .map((p: any) => p.id);
     } else {
       targetIds = body.friendIds || [];
     }
 
-    targetIds = targetIds.filter((id) => id && !existingIds.has(id) && id !== body.ownerId);
+    targetIds = [...new Set(targetIds.filter((id) => id && id !== body.ownerId))];
+
+    if (!targetIds.length) {
+      return Response.json({ ok: true, invitedCount: 0 });
+    }
 
     const usersResponse = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
     const userMap = new Map((usersResponse.data?.users || []).map((u: any) => [u.id, u.email]));
@@ -82,28 +89,38 @@ export async function POST(req: Request) {
 
     const settingMap = new Map((settings || []).map((s: any) => [s.user_id, !!s.email_event_invites]));
 
-    for (const userId of targetIds) {
+    const now = new Date().toISOString();
+    const rows = targetIds.map((userId) => {
       const email = userMap.get(userId);
-      const inviteeEmail = email ? String(email).toLowerCase() : `.local`;
-
-      await supabase.from("event_invites").insert({
+      return {
         event_id: body.eventId,
         inviter_id: body.ownerId,
-        invitee_email: inviteeEmail,
+        invitee_email: email ? String(email).toLowerCase() : `${userId}@member.local`,
         invitee_user_id: userId,
         status: "sent",
-        sent_at: new Date().toISOString(),
-      });
+        sent_at: now,
+      };
+    });
 
-      if (email && settingMap.get(userId)) {
-        await sendEmailIfOptedIn({
-          apiKey: resendApiKey,
-          fromEmail,
-          to: email,
-          subject: `You're invited: ${event.title}`,
-          html: `<p>You have been invited to <strong>${event.title}</strong>.</p><p>Starts: ${event.starts_at}</p><p>Location: ${event.location || "TBA"}</p>`,
-        });
-      }
+    const { error: inviteError } = await supabase
+      .from("event_invites")
+      .upsert(rows, { onConflict: "event_id,invitee_user_id", ignoreDuplicates: false });
+
+    if (inviteError) {
+      return Response.json({ ok: false, error: inviteError.message }, { status: 400 });
+    }
+
+    for (const userId of targetIds) {
+      const email = userMap.get(userId);
+      if (!email || !settingMap.get(userId)) continue;
+
+      await sendEmailIfOptedIn({
+        apiKey: resendApiKey,
+        fromEmail,
+        to: String(email),
+        subject: `You're invited: ${event.title}`,
+        html: `<p>You have been invited to <strong>${event.title}</strong>.</p><p>Starts: ${event.starts_at}</p><p>Location: ${event.location || "TBA"}</p>`,
+      });
     }
 
     return Response.json({ ok: true, invitedCount: targetIds.length });

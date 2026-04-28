@@ -75,7 +75,11 @@ export async function listInAppNotifications(userId: string) {
   ]);
 
   const readSet = new Set((readRows || []).map((r: any) => r.notification_id));
-  const profileIds = [...new Set([...(reqs || []).map((r: any) => r.from_user), ...(msgs || []).map((m: any) => m.sender_id), ...(eventInvites || []).map((e: any) => e.inviter_id)].filter(Boolean))];
+  const profileIds = [...new Set([
+    ...(reqs || []).map((r: any) => r.from_user),
+    ...(msgs || []).map((m: any) => m.sender_id),
+    ...(eventInvites || []).map((e: any) => e.inviter_id),
+  ].filter(Boolean))];
 
   let names = new Map<string, string>();
   if (profileIds.length) {
@@ -92,23 +96,38 @@ export async function listInAppNotifications(userId: string) {
 
   for (const r of reqs || []) {
     const id = `fr-${r.id}`;
-    if (!readSet.has(id)) {
-      notifications.push({ id, type: "friend_request", text: `${names.get(r.from_user) || "A member"} sent you a friend request`, href: "/friends", created_at: r.created_at });
-    }
+    if (readSet.has(id)) continue;
+    notifications.push({
+      id,
+      type: "friend_request",
+      text: `${names.get(r.from_user) || "A member"} sent you a friend request`,
+      href: "/friends",
+      created_at: r.created_at,
+    });
   }
 
   for (const m of msgs || []) {
     const id = `dm-${m.id}`;
-    if (!readSet.has(id)) {
-      notifications.push({ id, type: "private_message", text: `New message from ${names.get(m.sender_id) || "a member"}`, href: `/messages?thread=${encodeURIComponent(m.sender_id)}&notification=${encodeURIComponent(id)}`, created_at: m.created_at });
-    }
+    if (readSet.has(id)) continue;
+    notifications.push({
+      id,
+      type: "private_message",
+      text: `New message from ${names.get(m.sender_id) || "a member"}`,
+      href: `/messages?thread=${encodeURIComponent(m.sender_id)}&notification=${encodeURIComponent(id)}`,
+      created_at: m.created_at,
+    });
   }
 
   for (const ev of eventInvites || []) {
     const id = `event-${ev.id}`;
-    if (!readSet.has(id)) {
-      notifications.push({ id, type: "event_invite", text: `You're invited to ${eventNames.get(ev.event_id) || "an event"}`, href: `/events-app?event=${encodeURIComponent(ev.event_id)}&notification=${encodeURIComponent(id)}`, created_at: ev.sent_at || ev.created_at });
-    }
+    if (readSet.has(id)) continue;
+    notifications.push({
+      id,
+      type: "event_invite",
+      text: `You're invited to ${eventNames.get(ev.event_id) || "an event"}`,
+      href: `/events-app?event=${encodeURIComponent(ev.event_id)}&notification=${encodeURIComponent(id)}`,
+      created_at: ev.sent_at || ev.created_at,
+    });
   }
 
   return notifications.sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, 25);

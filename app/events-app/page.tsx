@@ -71,7 +71,7 @@ function EventMessageCard({
   const isFriend = friendIds.has(m.sender_id);
   const grouped = new Map<string, any[]>();
   (m.reactions || []).forEach((r: any) => grouped.set(r.emoji, [...(grouped.get(r.emoji) || []), r]));
-  
+
 
 
   return (
@@ -317,6 +317,21 @@ export default function EventsAppPage() {
       await refreshEvents(user.id);
     })();
   }, []);
+
+  useEffect(() => {
+    if (!me || !events.length) return;
+    const params = new URLSearchParams(window.location.search);
+    const eventFromUrl = params.get("event");
+    const notificationFromUrl = params.get("notification");
+    if (!eventFromUrl) return;
+    const found = events.find((ev: any) => ev.id === eventFromUrl);
+    if (found) {
+      openEvent(found);
+      if (notificationFromUrl) {
+        markNotificationRead(me, notificationFromUrl).catch(() => null);
+      }
+    }
+  }, [me, events]);
 
   const loadAwardOptions = async () => {
     const { data: profiles } = await supabase
@@ -595,7 +610,7 @@ export default function EventsAppPage() {
     } catch (e: any) {
       setStatus(e.message || "Unable to remove content.");
     }
-    
+
   };
   const awardBadge = async () => {
     if (!selectedEvent || !awardUserId.trim() || !canReview) return;
@@ -828,7 +843,7 @@ export default function EventsAppPage() {
                   />
                   )) : <p style={{ margin: 0, opacity: 0.7 }}>No event messages yet.</p>}
                 </div>
-                
+
                 <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
                   {replyTo ? <div style={{ opacity: 0.75 }}>Replying to message <code>{replyTo.slice(0, 8)}</code> <button className="button secondary" onClick={() => setReplyTo(null)}>Clear reply</button></div> : null}
                   <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Type an event message" style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />

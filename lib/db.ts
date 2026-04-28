@@ -362,7 +362,7 @@ export async function listMyEvents(created_by: string) {
   const { data, error } = await supabase
     .from("events")
     .select("*")
-    .eq("created_by", created_by)
+    .or(`created_by.eq.${created_by},is_public.eq.true`)
     .order("starts_at", { ascending: true });
   if (error) throw error;
   return data || [];
@@ -649,7 +649,31 @@ export async function listBadgesForUser(userId: string) {
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return data || [];
+
+  const rows = data || [];
+  const electionKeys = [...new Set(rows.map((b: any) => b.election_key).filter(Boolean))];
+
+  if (!electionKeys.length) return rows;
+
+  const { data: proposals } = await supabase
+    .from("proposals")
+    .select("election_key, title, expires_at")
+    .in("election_key", electionKeys);
+
+  const proposalMap = new Map((proposals || []).map((p: any) => [p.election_key, p]));
+
+  return rows.map((badge: any) => {
+    if (badge.badge_key !== "i_voted" || !badge.election_key) return badge;
+    const proposal = proposalMap.get(badge.election_key);
+    if (!proposal) return badge;
+
+    const expiration = proposal.expires_at ? new Date(proposal.expires_at).toLocaleDateString() : "no expiration";
+    return {
+      ...badge,
+      badge_label: `I Voted 🗳️ ${proposal.title} (${expiration})`,
+      emoji: "",
+    };
+  });
 }
 
 export async function listAvailabilityEntries(dateFrom?: string, dateTo?: string) {
@@ -708,6 +732,23 @@ export async function castProposalVote(payload: {
 }) {
   const { error } = await supabase.from("proposal_votes").insert(payload);
   if (error) throw error;
+
+  const { data: proposal } = await supabase
+    .from("proposals")
+    .select("title, election_key, expires_at")
+    .eq("id", payload.proposal_id)
+    .maybeSingle();
+
+  if (proposal?.election_key) {
+    const expiration = proposal.expires_at ? new Date(proposal.expires_at).toLocaleDateString() : "no expiration";
+    await grantBadge(
+      payload.user_id,
+      "i_voted",
+      `I Voted 🗳️ ${proposal.title || proposal.election_key} (${expiration})`,
+      "",
+      proposal.election_key
+    );
+  }
 }
 
 export async function listProposalVotes(proposal_id: string) {
