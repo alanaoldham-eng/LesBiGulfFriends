@@ -358,6 +358,7 @@ export async function createEvent(payload: {
   return data;
 }
 
+
 export async function listMyEvents(created_by: string) {
   const { data, error } = await supabase
     .from("events")
@@ -367,7 +368,6 @@ export async function listMyEvents(created_by: string) {
   if (error) throw error;
   return data || [];
 }
-
 export async function createEventInvite(event_id: string, inviter_id: string, invitee_email: string) {
   const { data, error } = await supabase
     .from("event_invites")
@@ -642,6 +642,7 @@ export async function listPositiveKarmaStandings(limit = 200) {
   return data || [];
 }
 
+
 export async function listBadgesForUser(userId: string) {
   const { data, error } = await supabase
     .from("user_badges")
@@ -663,19 +664,27 @@ export async function listBadgesForUser(userId: string) {
   const proposalMap = new Map((proposals || []).map((p: any) => [p.election_key, p]));
 
   return rows.map((badge: any) => {
-    if (badge.badge_key !== "i_voted" || !badge.election_key) return badge;
-    const proposal = proposalMap.get(badge.election_key);
+    const isVotedBadge =
+      badge.badge_key === "i_voted" ||
+      String(badge.badge_label || "").toLowerCase().includes("voted") ||
+      String(badge.badge_label || "").toLowerCase().includes("vote");
+
+    if (!isVotedBadge || !badge.election_key) return badge;
+
+    const proposal: any = proposalMap.get(badge.election_key);
     if (!proposal) return badge;
 
-    const expiration = proposal.expires_at ? new Date(proposal.expires_at).toLocaleDateString() : "no expiration";
+    const expiration = proposal.expires_at
+      ? new Date(proposal.expires_at).toLocaleDateString()
+      : "no expiration";
+
     return {
       ...badge,
-      badge_label: `I Voted 🗳️ ${proposal.title} (${expiration})`,
+      badge_label: `I Voted 🗳️ ${proposal.title || badge.election_key} (${expiration})`,
       emoji: "",
     };
   });
 }
-
 export async function listAvailabilityEntries(dateFrom?: string, dateTo?: string) {
   let q = supabase
     .from("member_availability")
@@ -725,6 +734,7 @@ export async function createProposal(payload: {
   return data;
 }
 
+
 export async function castProposalVote(payload: {
   proposal_id: string;
   user_id: string;
@@ -740,7 +750,10 @@ export async function castProposalVote(payload: {
     .maybeSingle();
 
   if (proposal?.election_key) {
-    const expiration = proposal.expires_at ? new Date(proposal.expires_at).toLocaleDateString() : "no expiration";
+    const expiration = proposal.expires_at
+      ? new Date(proposal.expires_at).toLocaleDateString()
+      : "no expiration";
+
     await grantBadge(
       payload.user_id,
       "i_voted",
@@ -750,7 +763,6 @@ export async function castProposalVote(payload: {
     );
   }
 }
-
 export async function listProposalVotes(proposal_id: string) {
   const { data, error } = await supabase
     .from("proposal_votes")

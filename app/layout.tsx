@@ -18,8 +18,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Image
                 src="/logo.png"
                 alt="Les Bi Gulf Friends"
-                width={40}
-                height={40}
+                width={38}
+                height={38}
                 style={{ borderRadius: 12, objectFit: "cover" }}
                 priority
               />

@@ -90,9 +90,10 @@ export async function POST(req: Request) {
     const settingMap = new Map((settings || []).map((s: any) => [s.user_id, !!s.email_event_invites]));
 
     const now = new Date().toISOString();
-    const rows = targetIds.map((userId) => {
+
+    for (const userId of targetIds) {
       const email = userMap.get(userId);
-      return {
+      const row = {
         event_id: body.eventId,
         inviter_id: body.ownerId,
         invitee_email: email ? String(email).toLowerCase() : `${userId}@member.local`,
@@ -100,27 +101,37 @@ export async function POST(req: Request) {
         status: "sent",
         sent_at: now,
       };
-    });
 
-    const { error: inviteError } = await supabase
-      .from("event_invites")
-      .upsert(rows, { onConflict: "event_id,invitee_user_id", ignoreDuplicates: false });
+      const { data: existing } = await supabase
+        .from("event_invites")
+        .select("id")
+        .eq("event_id", row.event_id)
+        .eq("invitee_user_id", row.invitee_user_id)
+        .maybeSingle();
 
-    if (inviteError) {
-      return Response.json({ ok: false, error: inviteError.message }, { status: 400 });
-    }
+      if (existing?.id) {
+        await supabase
+          .from("event_invites")
+          .update({
+            status: "sent",
+            sent_at: row.sent_at,
+            invitee_email: row.invitee_email,
+            inviter_id: row.inviter_id,
+          })
+          .eq("id", existing.id);
+      } else {
+        await supabase.from("event_invites").insert(row);
+      }
 
-    for (const userId of targetIds) {
-      const email = userMap.get(userId);
-      if (!email || !settingMap.get(userId)) continue;
-
-      await sendEmailIfOptedIn({
-        apiKey: resendApiKey,
-        fromEmail,
-        to: String(email),
-        subject: `You're invited: ${event.title}`,
-        html: `<p>You have been invited to <strong>${event.title}</strong>.</p><p>Starts: ${event.starts_at}</p><p>Location: ${event.location || "TBA"}</p>`,
-      });
+      if (email && settingMap.get(userId)) {
+        await sendEmailIfOptedIn({
+          apiKey: resendApiKey,
+          fromEmail,
+          to: String(email),
+          subject: `You're invited: ${event.title}`,
+          html: `<p>You have been invited to <strong>${event.title}</strong>.</p><p>Starts: ${event.starts_at}</p><p>Location: ${event.location || "TBA"}</p>`,
+        });
+      }
     }
 
     return Response.json({ ok: true, invitedCount: targetIds.length });

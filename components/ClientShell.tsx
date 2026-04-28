@@ -9,7 +9,7 @@ import { getViewerRoleFlags } from "../lib/roadmap";
 
 const ADMIN_EMAIL = "alanaoldham@gmail.com";
 
-const panelStyle: React.CSSProperties = {
+const panelBase: React.CSSProperties = {
   position: "absolute",
   top: 38,
   zIndex: 10001,
@@ -34,6 +34,9 @@ const menuItemStyle: React.CSSProperties = {
   fontSize: 13,
   lineHeight: 1.2,
   cursor: "pointer",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
 };
 
 export function ClientShell({ children }: { children: React.ReactNode }) {
@@ -64,7 +67,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           .then(setNotifications)
           .catch(() => setNotifications([]));
 
-        const roleFlags = await getViewerRoleFlags(user.id).catch(() => ({ canReview: false }));
+        const roleFlags = await getViewerRoleFlags(user.id).catch(() => ({
+          canReview: false,
+        }));
         setCanReview(!!roleFlags?.canReview);
       } else {
         setNotifications([]);
@@ -106,10 +111,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         {menuOpen ? (
           <div
             style={{
-              ...panelStyle,
+              ...panelBase,
               right: 0,
-              minWidth: 238,
-              maxWidth: "calc(100vw - 18px)",
+              width: 236,
+              maxWidth: "calc(100vw - 22px)",
               display: "grid",
               gap: 7,
             }}
@@ -172,10 +177,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             {notifOpen ? (
               <div
                 style={{
-                  ...panelStyle,
-                  right: -36,
-                  width: 330,
-                  maxWidth: "calc(100vw - 18px)",
+                  ...panelBase,
+                  right: 0,
+                  width: 320,
+                  maxWidth: "calc(100vw - 22px)",
                   maxHeight: 420,
                   overflow: "auto",
                 }}
@@ -229,7 +234,16 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             </button>
 
             {profileOpen ? (
-              <div style={{ ...panelStyle, right: 0, minWidth: 210, display: "grid", gap: 7 }}>
+              <div
+                style={{
+                  ...panelBase,
+                  right: 0,
+                  width: 210,
+                  maxWidth: "calc(100vw - 22px)",
+                  display: "grid",
+                  gap: 7,
+                }}
+              >
                 <Link href={currentUserId ? `/members/${currentUserId}` : "/profile"} style={menuItemStyle}>View Profile</Link>
                 <Link href="/profile" style={menuItemStyle}>Edit Profile</Link>
                 <Link href="/forgot-password" style={menuItemStyle}>Change Password</Link>

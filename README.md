@@ -1,14 +1,12 @@
-# v083 patch
+# v084.1 DB export fix
 
-Apply order:
-1. Run `sql/v083_public_events_and_badges.sql` in Supabase.
-2. Unzip this patch into the repo root and overwrite files.
-3. Run `npm run build`.
+This restores the missing availability exports in `lib/db.ts` while keeping the v084 fixes for:
+- public event visibility through `listMyEvents`
+- election badge label display through `listBadgesForUser`
+- vote badge creation through `castProposalVote`
 
-Fixes:
-- Hamburger menu opens to the left so it is not cut off on mobile.
-- Public events are visible to all members on the Events page.
-- Public event invite API invites all active members for in-app notifications.
-- Email event notifications are still sent only when members opt in.
-- SQL backfills all members into all public events, past and future.
-- I Voted badges display: `I Voted 🗳️ <Election Title> (<Expiration Date>)`.
+Apply by unzipping into repo root and overwriting `lib/db.ts`, then run:
+
+```powershell
+npm run build
+```

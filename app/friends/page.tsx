@@ -6,7 +6,17 @@ import { useEffect, useState } from "react";
 import { ClientShell } from "../../components/ClientShell";
 import { EmptyState } from "../../components/EmptyState";
 import { getCurrentUser } from "../../lib/auth";
-import { searchProfiles, sendFriendRequest, getIncomingFriendRequests, acceptFriendRequest, declineFriendRequest, listFriends, getMyProfile, listMyInvites } from "../../lib/db";
+import {
+  searchProfiles,
+  sendFriendRequest,
+  getIncomingFriendRequests,
+  acceptFriendRequest,
+  declineFriendRequest,
+  listFriends,
+  getMyProfile,
+  listMyInvites,
+} from "../../lib/db";
+import { supabase } from "../../lib/supabase/client";
 
 async function sendFriendRequestEmailNotification(recipientUserId: string, requesterName: string) {
   try {
@@ -16,6 +26,33 @@ async function sendFriendRequestEmailNotification(recipientUserId: string, reque
       body: JSON.stringify({ recipientUserId, requesterName }),
     });
   } catch {}
+}
+
+async function sortFriendsForMessages(me: string, rows: any[]) {
+  const enriched = await Promise.all(
+    rows.map(async (friend: any) => {
+      const { data } = await supabase
+        .from("messages")
+        .select("created_at")
+        .or(`and(sender_id.eq.${me},recipient_id.eq.${friend.id}),and(sender_id.eq.${friend.id},recipient_id.eq.${me})`)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      return {
+        ...friend,
+        lastMessageAt: data?.[0]?.created_at || null,
+      };
+    })
+  );
+
+  return enriched.sort((a: any, b: any) => {
+    if (a.lastMessageAt && b.lastMessageAt) {
+      return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+    }
+    if (a.lastMessageAt) return -1;
+    if (b.lastMessageAt) return 1;
+    return Number(b.karma_points || 0) - Number(a.karma_points || 0);
+  });
 }
 
 export default function FriendsPage() {
@@ -34,8 +71,9 @@ export default function FriendsPage() {
       listFriends(userId).catch(() => []),
       listMyInvites(userId).catch(() => []),
     ]);
+
     setRequests(reqs);
-    setFriends(frs);
+    setFriends(await sortFriendsForMessages(userId, frs));
     setInvites(myInvites);
   };
 
@@ -88,12 +126,14 @@ export default function FriendsPage() {
     }
   };
 
+  const avatarFor = (p: any) => p?.photo_urls?.[0] || p?.photo_url || null;
+
   return (
     <ClientShell>
       <section className="hero">
         <h1 style={{ margin: 0, fontSize: 30 }}>Friends & Invites</h1>
         <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
-          Search profiles, send friend requests, accept incoming requests, and track your pending invites in one place.
+          Find friends, review incoming requests, and manage invite troubleshooting.
         </p>
       </section>
 
@@ -101,15 +141,24 @@ export default function FriendsPage() {
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <h3 style={{ marginTop: 0 }}>Find people</h3>
           <div style={{ display: "grid", gap: 12 }}>
-            <input id="friend-search" name="friendSearch" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by display name"
-              style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+            <input
+              id="friend-search"
+              name="friendSearch"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by display name"
+              style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
+            />
             <button className="button" onClick={doSearch}>Search</button>
           </div>
+
           <div className="grid" style={{ marginTop: 14 }}>
             {results.map((p) => (
               <section key={p.id} style={{ border: "1px solid #f1dfe8", borderRadius: 18, padding: 14 }}>
                 <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                  {(p.photo_urls?.[0] || p.photo_url) ? <img src={p.photo_urls?.[0] || p.photo_url} alt={p.display_name} style={{ width: 44, height: 44, borderRadius: 999, objectFit: "cover" }} /> : null}
+                  {avatarFor(p) ? (
+                    <img src={avatarFor(p)} alt={p.display_name} style={{ width: 44, height: 44, borderRadius: 999, objectFit: "cover" }} />
+                  ) : null}
                   <div>
                     <Link href={`/members/${p.id}`} style={{ fontWeight: 700, color: "#8d2d5d" }}>{p.display_name}</Link>
                     <p style={{ margin: "6px 0 0", opacity: 0.8 }}>{p.bio || "No bio yet."}</p>
@@ -121,6 +170,46 @@ export default function FriendsPage() {
               </section>
             ))}
           </div>
+        </section>
+
+        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
+          <h3 style={{ marginTop: 0 }}>Your friends</h3>
+          {friends.length ? (
+            <div style={{ display: "grid", gap: 10 }}>
+              {friends.map((friend: any) => (
+                <Link
+                  key={friend.id}
+                  href={`/members/${friend.id}`}
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "center",
+                    padding: 10,
+                    border: "1px solid #f1dfe8",
+                    borderRadius: 16,
+                    background: "#fff",
+                    textDecoration: "none",
+                  }}
+                >
+                  {avatarFor(friend) ? (
+                    <img src={avatarFor(friend)} alt={friend.display_name} style={{ width: 42, height: 42, borderRadius: 999, objectFit: "cover" }} />
+                  ) : (
+                    <div style={{ width: 42, height: 42, borderRadius: 999, background: "#f8e8ef", display: "grid", placeItems: "center" }}>👤</div>
+                  )}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, color: "#8d2d5d" }}>{friend.display_name || "Member"}</div>
+                    {friend.lastMessageAt ? (
+                      <div style={{ fontSize: 12, opacity: 0.65 }}>Last message: {new Date(friend.lastMessageAt).toLocaleString()}</div>
+                    ) : (
+                      <div style={{ fontSize: 12, opacity: 0.65 }}>{Number(friend.karma_points || 0).toFixed(1)} karma</div>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="No friends yet" body="Search profiles or invite friends to start connecting." />
+          )}
         </section>
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
@@ -138,27 +227,10 @@ export default function FriendsPage() {
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <h3 style={{ marginTop: 0 }}>Your invites</h3>
-          {invites.length ? (
-            <ul style={{ lineHeight: 1.8, paddingLeft: 18, margin: 0 }}>
-              {invites.map((inv) => <li key={inv.id}>{inv.invitee_email} <span style={{ opacity: 0.7 }}>({inv.status})</span></li>)}
-            </ul>
-          ) : (
-            <EmptyState title="No invites yet" body="When you invite someone by email, it will appear here." />
-          )}
-          <div style={{ marginTop: 10 }}>
-            <Link href="/invites" className="button secondary">Manage invites</Link>
-          </div>
-        </section>
-
-        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
-          <h3 style={{ marginTop: 0 }}>Your friends</h3>
-          {friends.length ? (
-            <ul style={{ lineHeight: 1.8, paddingLeft: 18, margin: 0 }}>
-              {friends.map((f) => <li key={f.id}><Link href={`/members/${f.id}`} style={{ color: "#8d2d5d" }}>{f.display_name}</Link></li>)}
-            </ul>
-          ) : (
-            <EmptyState title="No friends yet" body="Start by searching and sending your first request." />
-          )}
+          <p style={{ marginTop: 0, opacity: 0.8 }}>
+            {invites.length ? `${invites.length} invite${invites.length === 1 ? "" : "s"} sent.` : "No invites sent yet."}
+          </p>
+          <Link href="/invites" className="button secondary">Manage invites</Link>
         </section>
 
         {status ? <p style={{ margin: 0, opacity: 0.8 }}>{status}</p> : null}

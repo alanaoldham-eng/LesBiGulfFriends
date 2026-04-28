@@ -64,6 +64,7 @@ export async function markNotificationRead(userId: string, notificationId: strin
   if (error) throw error;
 }
 
+
 export async function listInAppNotifications(userId: string) {
   const notifications: any[] = [];
 
