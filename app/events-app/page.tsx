@@ -264,7 +264,12 @@ export default function EventsAppPage() {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [mediaVisibleCount, setMediaVisibleCount] = useState(3);
   const [deleteTarget, setDeleteTarget] = useState<{ type: "event_media" | "event_messages"; id: string } | null>(null);
-
+  const [savingEvent, setSavingEvent] = useState(false);
+  const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
+  const [showPastEvents, setShowPastEvents] = useState(false);
+  const [eventRsvps, setEventRsvps] = useState<any[]>([]);
+  const [rsvpTab, setRsvpTab] = useState<"going" | "maybe" | "cant_make_it">("going");
+  const [savingRsvp, setSavingRsvp] = useState(false);
 
   const nowTs = Date.now();
   const selectedEventDateLabel = useMemo(() => selectedEvent?.starts_at ? new Date(selectedEvent.starts_at).toLocaleDateString() : "", [selectedEvent]);
@@ -281,6 +286,12 @@ export default function EventsAppPage() {
   const selectedEventStarted = selectedEvent ? new Date(selectedEvent.starts_at).getTime() <= nowTs : false;
   const activeEventMedia = useMemo(() => (eventMedia || []).filter((item: any) => item.moderation_status !== "removed"), [eventMedia]);
   const visibleEventMedia = useMemo(() => activeEventMedia.slice(0, mediaVisibleCount), [activeEventMedia, mediaVisibleCount]);
+  const rsvpGroups = useMemo(() => ({
+    going: eventRsvps.filter((row: any) => row.rsvp_status === "going"),
+    maybe: eventRsvps.filter((row: any) => row.rsvp_status === "maybe"),
+    cant_make_it: eventRsvps.filter((row: any) => row.rsvp_status === "cant_make_it"),
+  }), [eventRsvps]);
+  const myRsvp = useMemo(() => eventRsvps.find((row: any) => row.user_id === me)?.rsvp_status || "", [eventRsvps, me]);
 
   const clearForm = () => {
     setTitle("");
@@ -343,6 +354,36 @@ export default function EventsAppPage() {
     setAwardOptions((profiles || []).map((p: any) => ({ id: p.id, label: p.display_name || p.id })));
   };
 
+  const loadRsvps = async (eventId: string) => {
+    const { data, error } = await supabase
+      .from("event_rsvps")
+      .select("*, profile:profiles(id, display_name)")
+      .eq("event_id", eventId)
+      .order("updated_at", { ascending: false });
+    if (!error) setEventRsvps(data || []);
+  };
+
+  const submitRsvp = async (rsvp_status: "going" | "maybe" | "cant_make_it") => {
+    if (!selectedEvent || !me || savingRsvp) return;
+    setSavingRsvp(true);
+    try {
+      const { error } = await supabase.from("event_rsvps").upsert({
+        event_id: selectedEvent.id,
+        user_id: me,
+        rsvp_status,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "event_id,user_id" });
+      if (error) throw error;
+      setRsvpTab(rsvp_status);
+      await loadRsvps(selectedEvent.id);
+      setStatus("RSVP updated.");
+    } catch (e: any) {
+      setStatus(e.message || "Unable to update RSVP.");
+    } finally {
+      setSavingRsvp(false);
+    }
+  };
+
   const refreshSelectedEventDetails = async (eventId?: string) => {
     const id = eventId || selectedEvent?.id;
     if (!id) return;
@@ -356,6 +397,7 @@ export default function EventsAppPage() {
     setEventInvites(invs);
     setEventMessages(msgs);
     setEventMedia(media);
+    await loadRsvps(id);
     setLoadingDetails(false);
   };
 
@@ -366,9 +408,13 @@ export default function EventsAppPage() {
     setEventInvites([]);
     setEventMessages([]);
     setEventMedia([]);
+    setEventRsvps([]);
     setMediaVisibleCount(3);
     setStatus("");
-    setTimeout(() => { refreshSelectedEventDetails(ev.id); }, 0);
+    setTimeout(() => {
+      document.getElementById("opened-event-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      refreshSelectedEventDetails(ev.id);
+    }, 0);
   };
 
   const openCreate = () => {
@@ -392,8 +438,24 @@ export default function EventsAppPage() {
   };
 
   const createOrUpdate = async () => {
-    if (!me || !title.trim() || !startsAt) return;
+    if (savingEvent || !me || !title.trim() || !startsAt) return;
 
+    const cleanTitle = title.trim().toLowerCase();
+    const cleanDescription = description.trim().toLowerCase();
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    const duplicateRecent = events.some((ev: any) =>
+      ev.created_by === me &&
+      String(ev.title || "").trim().toLowerCase() === cleanTitle &&
+      String(ev.description || "").trim().toLowerCase() === cleanDescription &&
+      new Date(ev.created_at || 0).getTime() >= oneHourAgo &&
+      (formMode !== "edit" || ev.id !== selectedEvent?.id)
+    );
+    if (duplicateRecent) {
+      setStatus("That event looks like a duplicate from the last hour. Please edit the existing event or wait before creating it again.");
+      return;
+    }
+
+    setSavingEvent(true);
     try {
       let coverImageUrl: string | null = selectedEvent?.cover_image_url || null;
       if (coverFile) {
@@ -427,32 +489,21 @@ export default function EventsAppPage() {
           is_public: isPublic,
         });
 
-        let inviteSummary = "";
         if (isPublic) {
-          const inviteResponse = await fetch("/api/events/invite", {
+          await fetch("/api/events/invite", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ mode: "public", eventId: ev.id, ownerId: me }),
           });
-          const inviteResult = await inviteResponse.json().catch(() => ({}));
-          if (!inviteResponse.ok || inviteResult?.ok === false) {
-            throw new Error(inviteResult?.error || "Event created, but public event notifications failed.");
-          }
-          inviteSummary = ` ${inviteResult.notificationCount || 0} in-app notification${inviteResult.notificationCount === 1 ? "" : "s"} queued.`;
         } else if (selectedFriendIds.length) {
-          const inviteResponse = await fetch("/api/events/invite", {
+          await fetch("/api/events/invite", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ mode: "private", eventId: ev.id, ownerId: me, friendIds: selectedFriendIds }),
           });
-          const inviteResult = await inviteResponse.json().catch(() => ({}));
-          if (!inviteResponse.ok || inviteResult?.ok === false) {
-            throw new Error(inviteResult?.error || "Event created, but private event notifications failed.");
-          }
-          inviteSummary = ` ${inviteResult.notificationCount || 0} in-app notification${inviteResult.notificationCount === 1 ? "" : "s"} queued.`;
         }
 
-        setStatus(`Event created.${inviteSummary}`);
+        setStatus("Event created.");
       }
 
       clearForm();
@@ -460,10 +511,14 @@ export default function EventsAppPage() {
       await refreshEvents(me);
     } catch (e: any) {
       setStatus(e.message || "Unable to save event.");
+    } finally {
+      setSavingEvent(false);
     }
   };
 
   const deleteEvent = async (eventId: string) => {
+    if (deletingEventId) return;
+    setDeletingEventId(eventId);
     try {
       await deleteEventByOwner(eventId, me);
       if (selectedEvent?.id === eventId) {
@@ -476,6 +531,8 @@ export default function EventsAppPage() {
       setStatus("Event deleted.");
     } catch (e: any) {
       setStatus(e.message || "Unable to delete event.");
+    } finally {
+      setDeletingEventId(null);
     }
   };
 
@@ -654,10 +711,13 @@ export default function EventsAppPage() {
         <div key={ev.id} style={{ borderBottom: "1px solid #f1dfe8", padding: "10px 0" }}>
           <strong>{ev.title}</strong>
           <div style={{ opacity: 0.8 }}>{new Date(ev.starts_at).toLocaleString()}</div>
+          {ev.cover_image_url ? (
+            <img src={ev.cover_image_url} loading="lazy" alt={ev.title} style={{ width: "100%", maxHeight: 180, objectFit: "cover", borderRadius: 14, border: "1px solid #ead5df", marginTop: 8 }} />
+          ) : null}
           <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button className="button secondary" onClick={() => openEvent(ev)}>Open event</button>
             {kind === "upcoming" && ev.created_by === me ? <button className="button secondary" onClick={() => openEdit(ev)}>Edit event</button> : null}
-            {kind === "upcoming" && ev.created_by === me ? <button className="button secondary" onClick={() => deleteEvent(ev.id)}>Delete event</button> : null}
+            {kind === "upcoming" && ev.created_by === me ? <button className="button secondary" onClick={() => deleteEvent(ev.id)} disabled={deletingEventId === ev.id}>{deletingEventId === ev.id ? "Deleting..." : "Delete event"}</button> : null}
             {allowPastFixEdit && ev.created_by === me ? <button className="button secondary" onClick={() => openEdit(ev)}>Edit event</button> : null}
           </div>
         </div>
@@ -674,64 +734,8 @@ export default function EventsAppPage() {
       </section>
 
       <div className="grid">
-        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
-          <h3 style={{ marginTop: 0 }}>Upcoming Events</h3>
-          {renderEventList(upcomingEvents, "No upcoming events yet.", "upcoming")}
-        </section>
-
-        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <h3 style={{ marginTop: 0, marginBottom: 0 }}>{formMode === "edit" ? "Edit event" : "Create event"}</h3>
-            {karmaPoints >= 1 && formMode === "closed" ? <button className="button" onClick={openCreate}>Create Event</button> : null}
-            {formMode !== "closed" ? <button className="button secondary" onClick={() => { setFormMode("closed"); clearForm(); }}>Close</button> : null}
-          </div>
-
-          {formMode !== "closed" ? (
-            karmaPoints > 0 || formMode === "edit" ? (
-              <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-                <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-                <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-                <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="Optional event link" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-
-                <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
-                  <span>Public event</span>
-                </label>
-
-                {!isPublic ? (
-                  <div style={{ display: "grid", gap: 8, border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, background: "#fffafc" }}>
-                    <strong>Select friends to invite</strong>
-                    {friends.length ? friends.map((f: any) => (
-                      <label key={f.id} style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                        <input
-                          type="checkbox"
-                          checked={selectedFriendIds.includes(f.id)}
-                          onChange={(e) => setSelectedFriendIds((prev) => e.target.checked ? [...prev, f.id] : prev.filter((id) => id !== f.id))}
-                        />
-                        <span>{f.display_name || f.email || f.id}</span>
-                      </label>
-                    )) : <div style={{ opacity: 0.75 }}>No friends available yet.</div>}
-                  </div>
-                ) : null}
-
-                <input type="file" accept="image/*" onChange={(e) => setCoverFile(e.target.files?.[0] || null)} />
-                <button className="button" onClick={createOrUpdate} disabled={!me || !title || !startsAt}>
-                  {formMode === "edit" ? "Save event" : "Create event"}
-                </button>
-              </div>
-            ) : <EmptyState title="Need 1 karma point" body="Creating an event costs 1 karma point." />
-          ) : <p style={{ marginTop: 12, opacity: 0.75 }}>The form stays collapsed until you need it.</p>}
-        </section>
-
-        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
-          <h3 style={{ marginTop: 0 }}>Past Events</h3>
-          {renderEventList(pastEvents, "No past events yet.", "past")}
-        </section>
-
         {selectedEvent ? (
-          <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
+          <section id="opened-event-panel" style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
             <h3 style={{ marginTop: 0 }}>{selectedEvent.title}</h3>
             {selectedEvent.cover_image_url ? <img src={selectedEvent.cover_image_url} loading="lazy" alt={selectedEvent.title} style={{ width: "100%", maxWidth: 420, borderRadius: 18, border: "1px solid #ead5df", marginBottom: 12 }} /> : null}
             {selectedEvent.description ? <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{selectedEvent.description}</p> : null}
@@ -739,6 +743,27 @@ export default function EventsAppPage() {
             <p style={{ opacity: 0.8 }}>{new Date(selectedEvent.starts_at).toLocaleString()} • {selectedEvent.location || "Location TBD"}</p>
 
             {loadingDetails ? <p style={{ opacity: 0.75 }}>Loading event details…</p> : null}
+
+            <div style={{ marginTop: 16, borderTop: "1px solid #f1dfe8", paddingTop: 16 }}>
+              <h4 style={{ marginTop: 0 }}>RSVP</h4>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                <button className={myRsvp === "going" ? "button" : "button secondary"} onClick={() => submitRsvp("going")} disabled={savingRsvp}>Going</button>
+                <button className={myRsvp === "maybe" ? "button" : "button secondary"} onClick={() => submitRsvp("maybe")} disabled={savingRsvp}>Maybe</button>
+                <button className={myRsvp === "cant_make_it" ? "button" : "button secondary"} onClick={() => submitRsvp("cant_make_it")} disabled={savingRsvp}>Can't make it</button>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                <button className={rsvpTab === "going" ? "button" : "button secondary"} onClick={() => setRsvpTab("going")}>Going ({rsvpGroups.going.length})</button>
+                <button className={rsvpTab === "maybe" ? "button" : "button secondary"} onClick={() => setRsvpTab("maybe")}>Maybe ({rsvpGroups.maybe.length})</button>
+                <button className={rsvpTab === "cant_make_it" ? "button" : "button secondary"} onClick={() => setRsvpTab("cant_make_it")}>Can't make it ({rsvpGroups.cant_make_it.length})</button>
+              </div>
+              <div style={{ border: "1px solid #f1dfe8", borderRadius: 14, padding: 10, background: "#fffafc" }}>
+                {(rsvpGroups[rsvpTab] || []).length ? (rsvpGroups[rsvpTab] || []).map((row: any) => (
+                  <div key={row.id || row.user_id} style={{ padding: "6px 0", borderBottom: "1px solid #f6e8ef" }}>
+                    <Link href={`/members/${row.user_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>{row.profile?.display_name || row.user_id}</Link>
+                  </div>
+                )) : <p style={{ margin: 0, opacity: 0.75 }}>No RSVPs in this tab yet.</p>}
+              </div>
+            </div>
 
             <div style={{ marginTop: 16, borderTop: "1px solid #f1dfe8", paddingTop: 16, display: "grid", gap: 16 }}>
               <div>
@@ -866,6 +891,69 @@ export default function EventsAppPage() {
             </div>
           </section>
         ) : null}
+
+
+
+        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
+          <h3 style={{ marginTop: 0 }}>Upcoming Events</h3>
+          {renderEventList(upcomingEvents, "No upcoming events yet.", "upcoming")}
+        </section>
+
+        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <h3 style={{ marginTop: 0, marginBottom: 0 }}>{formMode === "edit" ? "Edit event" : "Create event"}</h3>
+            {karmaPoints >= 1 && formMode === "closed" ? <button className="button" onClick={openCreate}>Create Event</button> : null}
+            {formMode !== "closed" ? <button className="button secondary" onClick={() => { setFormMode("closed"); clearForm(); }}>Close</button> : null}
+          </div>
+
+          {formMode !== "closed" ? (
+            karmaPoints > 0 || formMode === "edit" ? (
+              <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+                <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+                <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+                <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="Optional event link" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
+
+                <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
+                  <span>Public event</span>
+                </label>
+
+                {!isPublic ? (
+                  <div style={{ display: "grid", gap: 8, border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, background: "#fffafc" }}>
+                    <strong>Select friends to invite</strong>
+                    {friends.length ? friends.map((f: any) => (
+                      <label key={f.id} style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedFriendIds.includes(f.id)}
+                          onChange={(e) => setSelectedFriendIds((prev) => e.target.checked ? [...prev, f.id] : prev.filter((id) => id !== f.id))}
+                        />
+                        <span>{f.display_name || f.email || f.id}</span>
+                      </label>
+                    )) : <div style={{ opacity: 0.75 }}>No friends available yet.</div>}
+                  </div>
+                ) : null}
+
+                <input type="file" accept="image/*" onChange={(e) => setCoverFile(e.target.files?.[0] || null)} />
+                <button className="button" onClick={createOrUpdate} disabled={savingEvent || !me || !title || !startsAt}>
+                  {savingEvent ? "Working..." : formMode === "edit" ? "Save event" : "Create event"}
+                </button>
+              </div>
+            ) : <EmptyState title="Need 1 karma point" body="Creating an event costs 1 karma point." />
+          ) : <p style={{ marginTop: 12, opacity: 0.75 }}>The form stays collapsed until you need it.</p>}
+        </section>
+
+        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <h3 style={{ marginTop: 0, marginBottom: 0 }}>Past Events</h3>
+            <button className="button secondary" onClick={() => setShowPastEvents((v) => !v)}>
+              {showPastEvents ? "Close Past Events" : "Open Past Events"}
+            </button>
+          </div>
+          {showPastEvents ? <div style={{ marginTop: 12 }}>{renderEventList(pastEvents, "No past events yet.", "past")}</div> : null}
+        </section>
 
       </div>
       <DeleteReasonModal

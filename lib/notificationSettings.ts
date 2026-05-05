@@ -56,46 +56,36 @@ export async function upsertEmailNotificationSettings(settings: EmailNotificatio
 }
 
 export async function markNotificationRead(userId: string, notificationId: string) {
+  const now = new Date().toISOString();
+
   const { error } = await supabase.from("notification_reads").upsert({
     user_id: userId,
     notification_id: notificationId,
-    read_at: new Date().toISOString(),
+    read_at: now,
   });
   if (error) throw error;
-}
 
+  // Durable notifications have UUID ids. Legacy virtual notifications use ids like "dm-..." or "event-...".
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(notificationId)) {
+    await supabase
+      .from("in_app_notifications")
+      .update({ read_at: now })
+      .eq("id", notificationId)
+      .eq("recipient_user_id", userId);
+  }
+}
 
 export async function listInAppNotifications(userId: string) {
   const notifications: any[] = [];
 
-  const [{ data: readRows }, { data: storedRows }, { data: reqs }, { data: msgs }, { data: eventInvites }] = await Promise.all([
+  const [{ data: readRows }, { data: reqs }, { data: msgs }, { data: eventInvites }] = await Promise.all([
     supabase.from("notification_reads").select("notification_id").eq("user_id", userId),
-    supabase
-      .from("in_app_notifications")
-      .select("id, type, title, body, href, created_at, read_at")
-      .eq("recipient_user_id", userId)
-      .is("read_at", null)
-      .order("created_at", { ascending: false })
-      .limit(50),
     supabase.from("friend_requests").select("id, from_user, created_at, status").eq("to_user", userId).eq("status", "pending").order("created_at", { ascending: false }).limit(20),
     supabase.from("messages").select("id, sender_id, created_at").eq("recipient_id", userId).order("created_at", { ascending: false }).limit(20),
     supabase.from("event_invites").select("id, event_id, inviter_id, created_at, sent_at, status").eq("invitee_user_id", userId).order("created_at", { ascending: false }).limit(30),
   ]);
 
   const readSet = new Set((readRows || []).map((r: any) => r.notification_id));
-
-  for (const n of storedRows || []) {
-    const id = String(n.id);
-    if (readSet.has(id)) continue;
-    notifications.push({
-      id,
-      type: n.type,
-      text: n.title || n.body || "New notification",
-      href: n.href || "/app",
-      created_at: n.created_at,
-    });
-  }
-
   const profileIds = [...new Set([
     ...(reqs || []).map((r: any) => r.from_user),
     ...(msgs || []).map((m: any) => m.sender_id),
@@ -142,41 +132,14 @@ export async function listInAppNotifications(userId: string) {
   for (const ev of eventInvites || []) {
     const id = `event-${ev.id}`;
     if (readSet.has(id)) continue;
-
-    // Avoid duplicate display if the durable notification table already has this exact event URL.
-    const href = `/events-app?event=${encodeURIComponent(ev.event_id)}&notification=${encodeURIComponent(id)}`;
-    const alreadyHasStored = notifications.some((n) => n.href?.includes(`/events-app?event=${encodeURIComponent(ev.event_id)}`));
-    if (alreadyHasStored) continue;
-
     notifications.push({
       id,
       type: "event_invite",
       text: `You're invited to ${eventNames.get(ev.event_id) || "an event"}`,
-      href,
+      href: `/events-app?event=${encodeURIComponent(ev.event_id)}&notification=${encodeURIComponent(id)}`,
       created_at: ev.sent_at || ev.created_at,
     });
   }
 
   return notifications.sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, 25);
-}
-
-export async function createStoredInAppNotification(payload: {
-  recipient_user_id: string;
-  actor_user_id?: string | null;
-  type: string;
-  title: string;
-  body?: string | null;
-  href: string;
-  event_id?: string | null;
-}) {
-  const { error } = await supabase.from("in_app_notifications").insert({
-    recipient_user_id: payload.recipient_user_id,
-    actor_user_id: payload.actor_user_id || null,
-    type: payload.type,
-    title: payload.title,
-    body: payload.body || null,
-    href: payload.href,
-    event_id: payload.event_id || null,
-  });
-  if (error) throw error;
 }

@@ -40,7 +40,7 @@ export default function MemberProfilePage() {
       ]);
       setProfile(p);
       setFriendIds(ids);
-      setBadges(badgeRows);
+      setBadges(p ? badgeRows : []);
       setMyName(myProfile?.display_name || "A member");
     };
     run();
@@ -61,6 +61,19 @@ export default function MemberProfilePage() {
   const extraPhotos = (profile?.photo_urls || []).slice(1, 3);
   const isSelf = me === memberId;
   const isFriend = friendIds.has(memberId);
+
+  if (!profile) {
+    return (
+      <ClientShell>
+        <section className="hero">
+          <h1 style={{ margin: 0, fontSize: 30 }}>Member unavailable</h1>
+          <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
+            This profile is no longer available.
+          </p>
+        </section>
+      </ClientShell>
+    );
+  }
 
   return (
     <ClientShell>

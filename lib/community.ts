@@ -22,6 +22,8 @@ export async function createCommunityGroup(args: {
   description?: string;
   isPrivate?: boolean;
   createdBy: string;
+  groupIconEmoji?: string | null;
+  groupLogoUrl?: string | null;
 }) {
   const cleanName = String(args.name || "").trim();
   if (!cleanName) throw new Error("Group name is required.");
@@ -33,6 +35,8 @@ export async function createCommunityGroup(args: {
       description: String(args.description || "").trim() || null,
       created_by: args.createdBy,
       is_private: Boolean(args.isPrivate),
+      group_icon_emoji: args.groupIconEmoji || null,
+      group_logo_url: args.groupLogoUrl || null,
     })
     .select("*")
     .single();

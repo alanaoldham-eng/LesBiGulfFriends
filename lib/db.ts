@@ -18,6 +18,10 @@ export type Profile = {
   city: string | null;
   relationship_status: RelationshipStatus | null;
   karma_points?: number | null;
+  membership_status?: string | null;
+  is_banned?: boolean | null;
+  removed_at?: string | null;
+  removed_reason?: string | null;
 };
 
 export type NotificationSettings = {
@@ -35,10 +39,16 @@ export async function getMyProfile(userId: string) {
   return data as Profile;
 }
 
+export function isVisibleProfile(profile: any) {
+  if (!profile) return false;
+  const status = String(profile.membership_status || "active").toLowerCase();
+  return !profile.is_banned && status !== "removed" && status !== "banned";
+}
+
 export async function getProfileById(userId: string) {
   const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
   if (error) throw error;
-  return data as Profile | null;
+  return isVisibleProfile(data) ? (data as Profile) : null;
 }
 
 export async function upsertMyProfile(profile: Partial<Profile> & { id: string }) {
@@ -60,11 +70,18 @@ export async function upsertMyProfile(profile: Partial<Profile> & { id: string }
 }
 
 export async function searchProfiles(query: string, me: string) {
-  let q = supabase.from("profiles").select("*").neq("id", me).order("display_name");
+  let q = supabase
+    .from("profiles")
+    .select("*")
+    .neq("id", me)
+    .neq("membership_status", "removed")
+    .neq("membership_status", "banned")
+    .eq("is_banned", false)
+    .order("display_name");
   if (query.trim()) q = q.ilike("display_name", `%${query.trim()}%`);
   const { data, error } = await q.limit(50);
   if (error) throw error;
-  return (data || []) as Profile[];
+  return (data || []).filter(isVisibleProfile) as Profile[];
 }
 
 export async function listFriendRequests() {
@@ -107,9 +124,15 @@ export async function listFriends(me: string) {
   const rows = data || [];
   const friendIds = rows.map((r: any) => (r.user_a === me ? r.user_b : r.user_a));
   if (!friendIds.length) return [];
-  const { data: profiles, error: pe } = await supabase.from("profiles").select("*").in("id", friendIds);
+  const { data: profiles, error: pe } = await supabase
+    .from("profiles")
+    .select("*")
+    .in("id", friendIds)
+    .eq("is_banned", false)
+    .neq("membership_status", "removed")
+    .neq("membership_status", "banned");
   if (pe) throw pe;
-  return profiles || [];
+  return (profiles || []).filter(isVisibleProfile);
 }
 
 export async function listDmMessages(me: string, other: string) {
@@ -300,14 +323,18 @@ export async function listGroupMembers(groupId: string) {
   if (userIds.length) {
     const { data: profs, error: pe } = await supabase
       .from("profiles")
-      .select("id, display_name, photo_url, photo_urls, karma_points")
-      .in("id", userIds);
+      .select("id, display_name, photo_url, photo_urls, karma_points, membership_status, is_banned")
+      .in("id", userIds)
+      .eq("is_banned", false)
+      .neq("membership_status", "removed")
+      .neq("membership_status", "banned");
     if (pe) throw pe;
     profiles = profs || [];
   }
-  const profileMap = new Map(profiles.map((p: any) => [p.id, p]));
+  const profileMap = new Map(profiles.filter(isVisibleProfile).map((p: any) => [p.id, p]));
   return (memberships || [])
     .map((m: any) => ({ ...m, profile: profileMap.get(m.user_id) || null }))
+    .filter((m: any) => !!m.profile)
     .sort((a: any, b: any) => {
       const ak = Number(a.profile?.karma_points || 0);
       const bk = Number(b.profile?.karma_points || 0);
@@ -358,7 +385,6 @@ export async function createEvent(payload: {
   return data;
 }
 
-
 export async function listMyEvents(created_by: string) {
   const { data, error } = await supabase
     .from("events")
@@ -368,6 +394,7 @@ export async function listMyEvents(created_by: string) {
   if (error) throw error;
   return data || [];
 }
+
 export async function createEventInvite(event_id: string, inviter_id: string, invitee_email: string) {
   const { data, error } = await supabase
     .from("event_invites")
@@ -642,7 +669,6 @@ export async function listPositiveKarmaStandings(limit = 200) {
   return data || [];
 }
 
-
 export async function listBadgesForUser(userId: string) {
   const { data, error } = await supabase
     .from("user_badges")
@@ -664,27 +690,19 @@ export async function listBadgesForUser(userId: string) {
   const proposalMap = new Map((proposals || []).map((p: any) => [p.election_key, p]));
 
   return rows.map((badge: any) => {
-    const isVotedBadge =
-      badge.badge_key === "i_voted" ||
-      String(badge.badge_label || "").toLowerCase().includes("voted") ||
-      String(badge.badge_label || "").toLowerCase().includes("vote");
-
-    if (!isVotedBadge || !badge.election_key) return badge;
-
-    const proposal: any = proposalMap.get(badge.election_key);
+    if (badge.badge_key !== "i_voted" || !badge.election_key) return badge;
+    const proposal = proposalMap.get(badge.election_key);
     if (!proposal) return badge;
 
-    const expiration = proposal.expires_at
-      ? new Date(proposal.expires_at).toLocaleDateString()
-      : "no expiration";
-
+    const expiration = proposal.expires_at ? new Date(proposal.expires_at).toLocaleDateString() : "no expiration";
     return {
       ...badge,
-      badge_label: `I Voted 🗳️ ${proposal.title || badge.election_key} (${expiration})`,
+      badge_label: `I Voted 🗳️ ${proposal.title} (${expiration})`,
       emoji: "",
     };
   });
 }
+
 export async function listAvailabilityEntries(dateFrom?: string, dateTo?: string) {
   let q = supabase
     .from("member_availability")
@@ -734,7 +752,6 @@ export async function createProposal(payload: {
   return data;
 }
 
-
 export async function castProposalVote(payload: {
   proposal_id: string;
   user_id: string;
@@ -750,10 +767,7 @@ export async function castProposalVote(payload: {
     .maybeSingle();
 
   if (proposal?.election_key) {
-    const expiration = proposal.expires_at
-      ? new Date(proposal.expires_at).toLocaleDateString()
-      : "no expiration";
-
+    const expiration = proposal.expires_at ? new Date(proposal.expires_at).toLocaleDateString() : "no expiration";
     await grantBadge(
       payload.user_id,
       "i_voted",
@@ -763,6 +777,7 @@ export async function castProposalVote(payload: {
     );
   }
 }
+
 export async function listProposalVotes(proposal_id: string) {
   const { data, error } = await supabase
     .from("proposal_votes")
@@ -776,10 +791,23 @@ export async function listProposalVotes(proposal_id: string) {
 export async function listProfilesForAdmin() {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, display_name, photo_url, photo_urls, karma_points")
+    .select("id, display_name, photo_url, photo_urls, karma_points, membership_status, is_banned, removed_at, removed_reason")
     .order("display_name", { ascending: true });
   if (error) throw error;
   return data || [];
+}
+
+export async function banMember(userId: string, reason: string) {
+  const cleanReason = String(reason || "").trim();
+  if (!cleanReason) throw new Error("Removal reason is required.");
+
+  const { data, error } = await supabase.rpc("ban_member_rpc", {
+    _target_user_id: userId,
+    _reason: cleanReason,
+  });
+
+  if (error) throw error;
+  return data;
 }
 
 export async function grantBadge(user_id: string, badge_key: string, badge_label: string, emoji: string, election_key?: string | null) {

@@ -35,11 +35,17 @@ export default function LoginPage() {
 
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("display_name")
+        .select("display_name, membership_status, is_banned")
         .eq("id", userData.user.id)
         .maybeSingle();
 
       if (profileError) throw new Error(profileError.message);
+
+      if (profile?.is_banned || ["removed", "banned"].includes(String(profile?.membership_status || "").toLowerCase())) {
+        await supabase.auth.signOut();
+        document.cookie = "lbgf_session=; Path=/; Max-Age=0; SameSite=Lax";
+        throw new Error("This account has been removed from Les Bi Gulf Friends.");
+      }
 
       const hasDisplayName = !!profile?.display_name?.trim() && profile?.display_name !== "New Member";
       localStorage.setItem("lbgf_profile_started", hasDisplayName ? "1" : "0");

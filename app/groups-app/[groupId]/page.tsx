@@ -9,6 +9,7 @@ import { StatusModal } from "../../../components/StatusModal";
 import { DeleteReasonModal } from "../../../components/DeleteReasonModal";
 import { getCurrentUser } from "../../../lib/auth";
 import {
+  banMember,
   getGroupById,
   getMyGroupMembership,
   listGroupMembers,
@@ -229,6 +230,7 @@ export default function GroupThreadPage() {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingMessageBody, setEditingMessageBody] = useState("");
   const [deleteTargetMessageId, setDeleteTargetMessageId] = useState<string | null>(null);
+  const [removeTargetUserId, setRemoveTargetUserId] = useState<string | null>(null);
 
   const canModerate = membership?.role === "owner" || membership?.role === "mod";
   const isOwner = membership?.role === "owner";
@@ -282,6 +284,20 @@ export default function GroupThreadPage() {
   }, [messages]);
 
   const visibleRoots = useMemo(() => messageTree.slice(0, visibleCount), [messageTree, visibleCount]);
+
+  const removeAndBanMember = async (reason: string) => {
+    if (!removeTargetUserId) return;
+
+    try {
+      await banMember(removeTargetUserId, reason);
+
+      setRemoveTargetUserId(null);
+      setStatus("Member removed and banned.");
+      await refresh(me);
+    } catch (e: any) {
+      setStatus(e.message || "Unable to remove member.");
+    }
+  };
 
   const send = async () => {
     if (!groupId || !me || (!body.trim() && !linkUrl.trim() && !attachment)) return;
@@ -489,7 +505,7 @@ export default function GroupThreadPage() {
                   {(m.profile?.photo_urls?.[0] || m.profile?.photo_url) ? <img src={m.profile?.photo_urls?.[0] || m.profile?.photo_url} alt={m.profile?.display_name || m.user_id} style={{ width: 36, height: 36, borderRadius: 999, objectFit: "cover" }} /> : null}
                   <div><div style={{ fontSize: 12, opacity: 0.65 }}>#{index + 1}</div><Link href={`/members/${m.user_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>{m.profile?.display_name || m.user_id}</Link><div style={{ opacity: 0.75 }}>{m.role} • {formatKarma(m.profile?.karma_points)} karma</div></div>
                 </div>
-                {canModerate && m.user_id !== me ? <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{isOwner && m.role === "member" ? <button className="button secondary" onClick={() => updateGroupMemberRole(groupId, m.user_id, "mod").then(() => refresh(me))}>Make mod</button> : null}{isOwner && m.role === "mod" ? <button className="button secondary" onClick={() => updateGroupMemberRole(groupId, m.user_id, "member").then(() => refresh(me))}>Make member</button> : null}{(isOwner || (membership?.role === "mod" && m.role === "member")) ? <button className="button secondary" onClick={() => removeGroupMember(groupId, m.user_id).then(() => refresh(me))}>Remove</button> : null}</div> : null}
+                {canModerate && m.user_id !== me ? <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{isOwner && m.role === "member" ? <button className="button secondary" onClick={() => updateGroupMemberRole(groupId, m.user_id, "mod").then(() => refresh(me))}>Make mod</button> : null}{isOwner && m.role === "mod" ? <button className="button secondary" onClick={() => updateGroupMemberRole(groupId, m.user_id, "member").then(() => refresh(me))}>Make member</button> : null}{(isOwner || (membership?.role === "mod" && m.role === "member")) ? <button className="button secondary" onClick={() => setRemoveTargetUserId(m.user_id)}>Remove</button> : null}</div> : null}
               </div>
             </div>
           ))}
@@ -502,6 +518,12 @@ export default function GroupThreadPage() {
         title="Remove group content"
         onCancel={() => setDeleteTargetMessageId(null)}
         onConfirm={removeContent}
+      />
+      <DeleteReasonModal
+        open={!!removeTargetUserId}
+        title="Remove and ban member"
+        onCancel={() => setRemoveTargetUserId(null)}
+        onConfirm={removeAndBanMember}
       />
       <StatusModal open={!!status} message={status} onClose={() => setStatus("")} />
     </ClientShell>

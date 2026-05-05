@@ -6,10 +6,11 @@ import { createPortal } from "react-dom";
 import { signOutEverywhere, getCurrentUser } from "../lib/auth";
 import { listInAppNotifications } from "../lib/notificationSettings";
 import { getViewerRoleFlags } from "../lib/roadmap";
+import { supabase } from "../lib/supabase/client";
 
 const ADMIN_EMAIL = "alanaoldham@gmail.com";
 
-const panelBase: React.CSSProperties = {
+const panelStyle: React.CSSProperties = {
   position: "absolute",
   top: 38,
   zIndex: 10001,
@@ -34,9 +35,6 @@ const menuItemStyle: React.CSSProperties = {
   fontSize: 13,
   lineHeight: 1.2,
   cursor: "pointer",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
 };
 
 export function ClientShell({ children }: { children: React.ReactNode }) {
@@ -63,13 +61,22 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       setCurrentUserId(user?.id || "");
 
       if (user?.id) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("membership_status, is_banned")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (profile?.is_banned || ["removed", "banned"].includes(String(profile?.membership_status || "").toLowerCase())) {
+          await signOutEverywhere();
+          return;
+        }
+
         listInAppNotifications(user.id)
           .then(setNotifications)
           .catch(() => setNotifications([]));
 
-        const roleFlags = await getViewerRoleFlags(user.id).catch(() => ({
-          canReview: false,
-        }));
+        const roleFlags = await getViewerRoleFlags(user.id).catch(() => ({ canReview: false }));
         setCanReview(!!roleFlags?.canReview);
       } else {
         setNotifications([]);
@@ -111,10 +118,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         {menuOpen ? (
           <div
             style={{
-              ...panelBase,
+              ...panelStyle,
               right: 0,
-              width: 236,
-              maxWidth: "calc(100vw - 22px)",
+              minWidth: 238,
+              maxWidth: "calc(100vw - 18px)",
               display: "grid",
               gap: 7,
             }}
@@ -177,10 +184,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             {notifOpen ? (
               <div
                 style={{
-                  ...panelBase,
-                  right: 0,
-                  width: 320,
-                  maxWidth: "calc(100vw - 22px)",
+                  ...panelStyle,
+                  right: -36,
+                  width: 330,
+                  maxWidth: "calc(100vw - 18px)",
                   maxHeight: 420,
                   overflow: "auto",
                 }}
@@ -234,16 +241,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             </button>
 
             {profileOpen ? (
-              <div
-                style={{
-                  ...panelBase,
-                  right: 0,
-                  width: 210,
-                  maxWidth: "calc(100vw - 22px)",
-                  display: "grid",
-                  gap: 7,
-                }}
-              >
+              <div style={{ ...panelStyle, right: 0, minWidth: 210, display: "grid", gap: 7 }}>
                 <Link href={currentUserId ? `/members/${currentUserId}` : "/profile"} style={menuItemStyle}>View Profile</Link>
                 <Link href="/profile" style={menuItemStyle}>Edit Profile</Link>
                 <Link href="/forgot-password" style={menuItemStyle}>Change Password</Link>

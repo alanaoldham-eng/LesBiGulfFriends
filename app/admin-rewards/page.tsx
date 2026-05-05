@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { ClientShell } from "../../components/ClientShell";
 import { getCurrentUser } from "../../lib/auth";
-import { grantBadge, listBadgesForUser, listProfilesForAdmin, rewardUserKarma } from "../../lib/db";
+import { banMember, grantBadge, listBadgesForUser, listProfilesForAdmin, rewardUserKarma } from "../../lib/db";
 import { supabase } from "../../lib/supabase/client";
 
 const ADMIN_EMAIL = "alanaoldham@gmail.com";
@@ -19,6 +19,9 @@ export default function AdminRewardsPage() {
   const [badgeUserId, setBadgeUserId] = useState("");
   const [badgeSelection, setBadgeSelection] = useState("og");
   const [eventBadgeOptions, setEventBadgeOptions] = useState<any[]>([]);
+  const [removeUserId, setRemoveUserId] = useState("");
+  const [removeReason, setRemoveReason] = useState("");
+  const [removingUser, setRemovingUser] = useState(false);
 
   useEffect(() => {
     const run = async () => {
@@ -56,6 +59,33 @@ export default function AdminRewardsPage() {
       setStatus(e.message || "Unable to reward karma.");
     }
   };
+
+  const removeAndBan = async () => {
+  if (!removeUserId || !removeReason.trim() || removingUser) return;
+
+  const confirmed = window.confirm(
+    "Remove and ban this member? This will hide them from the app and save the removal reason."
+  );
+
+  if (!confirmed) return;
+
+  setRemovingUser(true);
+
+  try {
+    await banMember(removeUserId, removeReason.trim());
+
+    setStatus("Member removed and banned.");
+    setRemoveUserId("");
+    setRemoveReason("");
+
+    const rows = await listProfilesForAdmin().catch(() => []);
+    setProfiles(rows);
+  } catch (e: any) {
+    setStatus(e.message || "Unable to remove member.");
+  } finally {
+    setRemovingUser(false);
+  }
+};
 
   const giveBadge = async () => {
     try {
@@ -96,6 +126,33 @@ export default function AdminRewardsPage() {
             <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Reason" style={{ minHeight: 120, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
             <button className="button" onClick={reward} disabled={!selectedUserId || !amount || !note.trim()}>Grant karma</button>
           </div>
+
+          <div style={{ height: 16 }} />
+          <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff7fb" }}>
+            <h3 style={{ marginTop: 0 }}>Remove / Ban member</h3>
+            <p style={{ marginTop: 0, opacity: 0.78 }}>
+              Use this for safety removals. The member is banned, removed from groups, logged out, and the reason is saved on their profile record.
+            </p>
+            <div style={{ display: "grid", gap: 12 }}>
+              <select value={removeUserId} onChange={(e) => setRemoveUserId(e.target.value)} style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, background: "#fff" }}>
+                <option value="">Select member to remove</option>
+                {profiles.map((profile: any) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.display_name || profile.id}{profile.is_banned ? " — BANNED" : ""}
+                  </option>
+                ))}
+              </select>
+              <textarea
+                value={removeReason}
+                onChange={(e) => setRemoveReason(e.target.value)}
+                placeholder="Required reason for removal"
+                style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
+              />
+              <button className="button" onClick={removeAndBan} disabled={!removeUserId || !removeReason.trim() || removingUser}>
+                {removingUser ? "Removing..." : "Remove and ban member"}
+              </button>
+            </div>
+          </section>
 
           <div style={{ height: 16 }} />
           <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
