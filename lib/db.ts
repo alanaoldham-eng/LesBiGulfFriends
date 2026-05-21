@@ -1023,3 +1023,20 @@ export function isProfileComplete(profile: Partial<Profile> | null | undefined) 
   const hasPhoto = !!(profile.photo_url || (profile.photo_urls && profile.photo_urls.length));
   return hasName && hasPhoto;
 }
+
+export async function setMemberModerator(
+  userId: string,
+  enabled: boolean
+) {
+  const { data, error } = await supabase.rpc(
+    "set_member_moderator_rpc",
+    {
+      _target_user_id: userId,
+      _enabled: enabled,
+    }
+  );
+
+  if (error) throw error;
+
+  return data;
+}

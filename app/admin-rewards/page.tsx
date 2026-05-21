@@ -4,9 +4,15 @@ export const dynamic = "force-dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { ClientShell } from "../../components/ClientShell";
 import { getCurrentUser } from "../../lib/auth";
-import { banMember, grantBadge, listBadgesForUser, listProfilesForAdmin, rewardUserKarma, setMemberModerator } from "../../lib/db";
+import {
+  banMember,
+  grantBadge,
+  listBadgesForUser,
+  listProfilesForAdmin,
+  rewardUserKarma,
+  setMemberModerator,
+} from "../../lib/db";
 import { supabase } from "../../lib/supabase/client";
-import { profile } from "console";
 
 const ADMIN_EMAIL = "alanaoldham@gmail.com";
 
@@ -23,169 +29,417 @@ export default function AdminRewardsPage() {
   const [removeUserId, setRemoveUserId] = useState("");
   const [removeReason, setRemoveReason] = useState("");
   const [removingUser, setRemovingUser] = useState(false);
+  const [moderatorWorkingId, setModeratorWorkingId] = useState("");
+
+  const refreshProfiles = async () => {
+    const rows = await listProfilesForAdmin().catch(() => []);
+    setProfiles(rows);
+  };
 
   useEffect(() => {
     const run = async () => {
       const user = await getCurrentUser().catch(() => null);
       const email = user?.email?.toLowerCase() || "";
+
       if (email !== ADMIN_EMAIL) return;
+
       setAllowed(true);
 
       const [rows, eventsRes] = await Promise.all([
         listProfilesForAdmin().catch(() => []),
-        supabase.from("events").select("id, title, starts_at").order("starts_at", { ascending: false }).limit(200),
+        supabase
+          .from("events")
+          .select("id, title, starts_at")
+          .order("starts_at", { ascending: false })
+          .limit(200),
       ]);
+
       setProfiles(rows);
-      setEventBadgeOptions((eventsRes.data || []).map((ev: any) => ({
-        value: `event:${ev.id}`,
-        label: `${ev.title} (${new Date(ev.starts_at).toLocaleDateString()})`,
-        badgeKey: "event_attended",
-        badgeLabel: `Attended ${ev.title} • ${new Date(ev.starts_at).toLocaleDateString()}`,
-        badgeEmoji: "😊",
-      })));
+
+      setEventBadgeOptions(
+        (eventsRes.data || []).map((ev: any) => ({
+          value: `event:${ev.id}`,
+          label: `${ev.title} (${new Date(ev.starts_at).toLocaleDateString()})`,
+          badgeKey: "event_attended",
+          badgeLabel: `Attended ${ev.title} • ${new Date(ev.starts_at).toLocaleDateString()}`,
+          badgeEmoji: "😊",
+        }))
+      );
     };
+
     run();
   }, []);
 
-  const badgeOptions = useMemo(() => ([
-    { value: "og", label: "OG badge", badgeKey: "og", badgeLabel: "OG", badgeEmoji: "👑" },
-    ...eventBadgeOptions,
-  ]), [eventBadgeOptions]);
+  const badgeOptions = useMemo(
+    () => [
+      {
+        value: "og",
+        label: "OG badge",
+        badgeKey: "og",
+        badgeLabel: "OG",
+        badgeEmoji: "👑",
+      },
+      ...eventBadgeOptions,
+    ],
+    [eventBadgeOptions]
+  );
 
   const reward = async () => {
     try {
       await rewardUserKarma(selectedUserId, Number(amount), note);
       setStatus("Karma reward granted.");
+      await refreshProfiles();
     } catch (e: any) {
       setStatus(e.message || "Unable to reward karma.");
     }
   };
 
+  const toggleModerator = async (userId: string, currentlyMod: boolean) => {
+    if (!userId || moderatorWorkingId) return;
+
+    setModeratorWorkingId(userId);
+
+    try {
+      await setMemberModerator(userId, !currentlyMod);
+
+      setStatus(
+        currentlyMod
+          ? "Moderator privileges removed."
+          : "Moderator privileges granted."
+      );
+
+      await refreshProfiles();
+    } catch (e: any) {
+      setStatus(e.message || "Unable to update moderator status.");
+    } finally {
+      setModeratorWorkingId("");
+    }
+  };
+
   const removeAndBan = async () => {
-  if (!removeUserId || !removeReason.trim() || removingUser) return;
+    if (!removeUserId || !removeReason.trim() || removingUser) return;
 
-  const confirmed = window.confirm(
-    "Remove and ban this member? This will hide them from the app and save the removal reason."
-  );
+    const confirmed = window.confirm(
+      "Remove and ban this member? This will hide them from the site and save the removal reason."
+    );
 
-  if (!confirmed) return;
+    if (!confirmed) return;
 
-  setRemovingUser(true);
+    setRemovingUser(true);
 
-  try {
-    await banMember(removeUserId, removeReason.trim());
+    try {
+      await banMember(removeUserId, removeReason.trim());
 
-    setStatus("Member removed and banned.");
-    setRemoveUserId("");
-    setRemoveReason("");
+      setStatus("Member removed and banned.");
+      setRemoveUserId("");
+      setRemoveReason("");
 
-    const rows = await listProfilesForAdmin().catch(() => []);
-    setProfiles(rows);
-  } catch (e: any) {
-    setStatus(e.message || "Unable to remove member.");
-  } finally {
-    setRemovingUser(false);
-  }
-};
+      await refreshProfiles();
+    } catch (e: any) {
+      setStatus(e.message || "Unable to remove member.");
+    } finally {
+      setRemovingUser(false);
+    }
+  };
 
   const giveBadge = async () => {
     try {
       const selected = badgeOptions.find((b) => b.value === badgeSelection);
+
       if (!selected) throw new Error("Select a badge first.");
+
       const existing = await listBadgesForUser(badgeUserId).catch(() => []);
-      const already = (existing || []).some((b: any) => b.badge_key === selected.badgeKey && b.badge_label === selected.badgeLabel);
+
+      const already = (existing || []).some(
+        (b: any) =>
+          b.badge_key === selected.badgeKey &&
+          b.badge_label === selected.badgeLabel
+      );
+
       if (already) {
         setStatus("That user already has that badge.");
         return;
       }
-      await grantBadge(badgeUserId, selected.badgeKey, selected.badgeLabel, selected.badgeEmoji, null);
+
+      await grantBadge(
+        badgeUserId,
+        selected.badgeKey,
+        selected.badgeLabel,
+        selected.badgeEmoji,
+        null
+      );
+
       setStatus("Badge granted.");
     } catch (e: any) {
       setStatus(e.message || "Unable to grant badge.");
     }
   };
 
-  const toggleModerator = async (userId: string, currentlyMod: boolean) => {
-  try {
-    await setMemberModerator(userId, !currentlyMod);
-    setStatus(currentlyMod ? "Moderator privileges removed." : "Moderator privileges granted.");
-
-    const rows = await listProfilesForAdmin().catch(() => []);
-    setProfiles(rows);
-  } catch (e: any) {
-    setStatus(e.message || "Unable to update moderator status.");
-  }
-};
-
   return (
     <ClientShell>
       <section className="hero">
         <h1 style={{ margin: 0, fontSize: 30 }}>Admin Magic Wand</h1>
-        <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>Manually reward helpful members and grant badges.</p>
+        <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
+          Manually reward helpful members, manage moderators, remove unsafe
+          members, and grant badges.
+        </p>
       </section>
 
       {!allowed ? (
-        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
-          <p style={{ margin: 0, opacity: 0.8 }}>This page is only available to the community admin.</p>
+        <section
+          style={{
+            border: "1px solid #e9d7e2",
+            borderRadius: 20,
+            padding: 16,
+            background: "#fff",
+          }}
+        >
+          <p style={{ margin: 0, opacity: 0.8 }}>
+            This page is only available to the community admin.
+          </p>
         </section>
       ) : (
-        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
+        <section
+          style={{
+            border: "1px solid #e9d7e2",
+            borderRadius: 20,
+            padding: 16,
+            background: "#fff",
+          }}
+        >
           <div style={{ display: "grid", gap: 12 }}>
-            <select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)} style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, background: "#fff" }}>
+            <select
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.target.value)}
+              style={{
+                padding: "14px 16px",
+                borderRadius: 16,
+                border: "1px solid #d7a8bf",
+                fontSize: 16,
+                background: "#fff",
+              }}
+            >
               <option value="">Select member</option>
-              {profiles.map((profile: any) => <option key={profile.id} value={profile.id}>{profile.display_name || profile.id}</option>)}
+              {profiles.map((profile: any) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.display_name || profile.id}
+                  {profile.is_banned ? " — BANNED" : ""}
+                  {profile.is_moderator ? " — MOD" : ""}
+                </option>
+              ))}
             </select>
-            <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount" style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-            <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Reason" style={{ minHeight: 120, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
-            <button className="button" onClick={reward} disabled={!selectedUserId || !amount || !note.trim()}>Grant karma</button>
+
+            <input
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="Amount"
+              style={{
+                padding: "14px 16px",
+                borderRadius: 16,
+                border: "1px solid #d7a8bf",
+                fontSize: 16,
+              }}
+            />
+
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Reason"
+              style={{
+                minHeight: 120,
+                padding: "14px 16px",
+                borderRadius: 16,
+                border: "1px solid #d7a8bf",
+                fontSize: 16,
+              }}
+            />
+
+            <button
+              className="button"
+              onClick={reward}
+              disabled={!selectedUserId || !amount || !note.trim()}
+            >
+              Grant karma
+            </button>
           </div>
+
           <div style={{ height: 16 }} />
-          <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff7fb" }}>
+
+          <section
+            style={{
+              border: "1px solid #e9d7e2",
+              borderRadius: 20,
+              padding: 16,
+              background: "#fff",
+            }}
+          >
+            <h3 style={{ marginTop: 0 }}>Toggle moderator status</h3>
+
+            <div style={{ display: "grid", gap: 10 }}>
+              {profiles
+                .filter((profile: any) => !profile.is_banned)
+                .map((profile: any) => (
+                  <div
+                    key={profile.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 10,
+                      flexWrap: "wrap",
+                      borderBottom: "1px solid #f1dfe8",
+                      padding: "10px 0",
+                    }}
+                  >
+                    <div>
+                      <strong>{profile.display_name || profile.id}</strong>
+                      <div style={{ fontSize: 12, opacity: 0.7 }}>
+                        {profile.is_moderator ? "Moderator" : "Member"}
+                      </div>
+                    </div>
+
+                    <button
+                      className="button secondary"
+                      onClick={() =>
+                        toggleModerator(profile.id, !!profile.is_moderator)
+                      }
+                      disabled={moderatorWorkingId === profile.id}
+                    >
+                      {moderatorWorkingId === profile.id
+                        ? "Working..."
+                        : profile.is_moderator
+                          ? "Remove Mod"
+                          : "Make Mod"}
+                    </button>
+                  </div>
+                ))}
+            </div>
+          </section>
+
+          <div style={{ height: 16 }} />
+
+          <section
+            style={{
+              border: "1px solid #e9d7e2",
+              borderRadius: 20,
+              padding: 16,
+              background: "#fff7fb",
+            }}
+          >
             <h3 style={{ marginTop: 0 }}>Remove / Ban member</h3>
             <p style={{ marginTop: 0, opacity: 0.78 }}>
-              Use this for safety removals. The member is banned, removed from groups, logged out, and the reason is saved on their profile record.
+              Use this for safety removals. The member is banned, removed from
+              groups, logged out, and the reason is saved on their profile
+              record.
             </p>
+
             <div style={{ display: "grid", gap: 12 }}>
-              <select value={removeUserId} onChange={(e) => setRemoveUserId(e.target.value)} style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, background: "#fff" }}>
+              <select
+                value={removeUserId}
+                onChange={(e) => setRemoveUserId(e.target.value)}
+                style={{
+                  padding: "14px 16px",
+                  borderRadius: 16,
+                  border: "1px solid #d7a8bf",
+                  fontSize: 16,
+                  background: "#fff",
+                }}
+              >
                 <option value="">Select member to remove</option>
                 {profiles.map((profile: any) => (
                   <option key={profile.id} value={profile.id}>
-                    {profile.display_name || profile.id}{profile.is_banned ? " — BANNED" : ""}
+                    {profile.display_name || profile.id}
+                    {profile.is_banned ? " — BANNED" : ""}
                   </option>
                 ))}
               </select>
+
               <textarea
                 value={removeReason}
                 onChange={(e) => setRemoveReason(e.target.value)}
                 placeholder="Required reason for removal"
-                style={{ minHeight: 100, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }}
+                style={{
+                  minHeight: 100,
+                  padding: "14px 16px",
+                  borderRadius: 16,
+                  border: "1px solid #d7a8bf",
+                  fontSize: 16,
+                }}
               />
-              <button className="button" onClick={removeAndBan} disabled={!removeUserId || !removeReason.trim() || removingUser}>
+
+              <button
+                className="button"
+                onClick={removeAndBan}
+                disabled={!removeUserId || !removeReason.trim() || removingUser}
+              >
                 {removingUser ? "Removing..." : "Remove and ban member"}
               </button>
             </div>
-            <div style={{ height: 16 }} />
-            <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff7fb" }}>
-              <h3 style={{ marginTop: 0 }}>Toggle moderator status</h3>
-              <button className="button secondary" onClick={() => toggleModerator(profile.id, !!profile.is_moderator)} {profile.is_moderator ? "Remove Mod" : "Make Mod"}</button>
-              </section>
-
+          </section>
 
           <div style={{ height: 16 }} />
-          <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
+
+          <section
+            style={{
+              border: "1px solid #e9d7e2",
+              borderRadius: 20,
+              padding: 16,
+              background: "#fff",
+            }}
+          >
             <h3 style={{ marginTop: 0 }}>Grant badge</h3>
+
             <div style={{ display: "grid", gap: 12 }}>
-              <select value={badgeUserId} onChange={(e) => setBadgeUserId(e.target.value)} style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, background: "#fff" }}>
+              <select
+                value={badgeUserId}
+                onChange={(e) => setBadgeUserId(e.target.value)}
+                style={{
+                  padding: "14px 16px",
+                  borderRadius: 16,
+                  border: "1px solid #d7a8bf",
+                  fontSize: 16,
+                  background: "#fff",
+                }}
+              >
                 <option value="">Select member</option>
-                {profiles.map((profile: any) => <option key={profile.id} value={profile.id}>{profile.display_name || profile.id}</option>)}
+                {profiles.map((profile: any) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.display_name || profile.id}
+                  </option>
+                ))}
               </select>
-              <select value={badgeSelection} onChange={(e) => setBadgeSelection(e.target.value)} style={{ padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16, background: "#fff" }}>
-                {badgeOptions.map((badge: any) => <option key={badge.value} value={badge.value}>{badge.label}</option>)}
+
+              <select
+                value={badgeSelection}
+                onChange={(e) => setBadgeSelection(e.target.value)}
+                style={{
+                  padding: "14px 16px",
+                  borderRadius: 16,
+                  border: "1px solid #d7a8bf",
+                  fontSize: 16,
+                  background: "#fff",
+                }}
+              >
+                {badgeOptions.map((badge: any) => (
+                  <option key={badge.value} value={badge.value}>
+                    {badge.label}
+                  </option>
+                ))}
               </select>
-              <button className="button" onClick={giveBadge} disabled={!badgeUserId || !badgeSelection}>Grant badge</button>
+
+              <button
+                className="button"
+                onClick={giveBadge}
+                disabled={!badgeUserId || !badgeSelection}
+              >
+                Grant badge
+              </button>
             </div>
           </section>
-          {status ? <p style={{ marginTop: 12, opacity: 0.8 }}>{status}</p> : null}
+
+          {status ? (
+            <p style={{ marginTop: 12, opacity: 0.8 }}>{status}</p>
+          ) : null}
         </section>
       )}
     </ClientShell>
