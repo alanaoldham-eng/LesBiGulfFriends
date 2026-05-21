@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { ClientShell } from "../../../components/ClientShell";
 import { getCurrentUser } from "../../../lib/auth";
 import { getProfileById, getFriendIds, sendFriendRequest, listBadgesForUser, getMyProfile } from "../../../lib/db";
@@ -24,6 +25,8 @@ export default function MemberProfilePage() {
   const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState("");
   const [badges, setBadges] = useState<any[]>([]);
+  const [eventBadgesOpen, setEventBadgesOpen] = useState(false);
+  const [votedBadgesOpen, setVotedBadgesOpen] = useState(false);
   const [myName, setMyName] = useState("A member");
 
   useEffect(() => {
@@ -62,6 +65,52 @@ export default function MemberProfilePage() {
   const isSelf = me === memberId;
   const isFriend = friendIds.has(memberId);
 
+  const parseBadgeDate = (badge: any) => {
+    const raw = `${badge.badge_label || ""} ${badge.created_at || ""}`;
+    const paren = String(badge.badge_label || "").match(/\(([^)]+)\)/)?.[1];
+    const parsed = Date.parse(paren || badge.event_date || badge.expires_at || badge.created_at || raw);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const badgeGroups = useMemo(() => {
+    const rows = badges || [];
+    const og = rows.filter((badge: any) =>
+      String(badge.badge_key || "").toLowerCase().includes("og") ||
+      String(badge.badge_label || "").toLowerCase().includes("og")
+    );
+
+    const voted = rows
+      .filter((badge: any) =>
+        String(badge.badge_key || "").toLowerCase().includes("voted") ||
+        String(badge.badge_key || "").toLowerCase().includes("vote") ||
+        String(badge.badge_label || "").toLowerCase().includes("voted") ||
+        String(badge.badge_label || "").includes("🗳️")
+      )
+      .sort((a: any, b: any) => parseBadgeDate(b) - parseBadgeDate(a));
+
+    const events = rows
+      .filter((badge: any) => {
+        const key = String(badge.badge_key || "").toLowerCase();
+        const label = String(badge.badge_label || "").toLowerCase();
+        const isOg = og.some((ogBadge: any) => ogBadge.id === badge.id);
+        const isVoted = voted.some((voteBadge: any) => voteBadge.id === badge.id);
+        return !isOg && !isVoted && (key.includes("event") || key.includes("attended") || label.includes("event") || label.includes("attended"));
+      })
+      .sort((a: any, b: any) => parseBadgeDate(b) - parseBadgeDate(a));
+
+    const used = new Set([...og, ...voted, ...events].map((badge: any) => badge.id));
+    const other = rows.filter((badge: any) => !used.has(badge.id));
+
+    return { og, events, voted, other };
+  }, [badges]);
+
+  const renderBadge = (badge: any) => (
+    <span key={badge.id} style={{ padding: "6px 10px", borderRadius: 999, background: "#fff7fb", border: "1px solid #f1dfe8", display: "inline-flex", gap: 4, alignItems: "center" }}>
+      {badge.emoji ? <span>{badge.emoji}</span> : null}
+      <span>{badge.badge_label}</span>
+    </span>
+  );
+
   if (!profile) {
     return (
       <ClientShell>
@@ -98,8 +147,39 @@ export default function MemberProfilePage() {
           ) : null}
           {profile?.city ? <p style={{ opacity: 0.75 }}>City: {profile.city}</p> : null}
           {profile?.relationship_status ? <p style={{ opacity: 0.75 }}>Relationship status: {profile.relationship_status}</p> : null}
-          {badges.length ? <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>{badges.map((badge) => <span key={badge.id} style={{ padding: "6px 10px", borderRadius: 999, background: "#fff7fb", border: "1px solid #f1dfe8" }}>{badge.emoji} {badge.badge_label}</span>)}</div> : null}
-          {!isSelf && !isFriend ? <button className="button" onClick={addFriend}>Add Friend</button> : null}
+          {badges.length ? (
+            <div className="badge-stack" style={{ display: "grid", gap: 10, marginBottom: 12 }}>
+              {badgeGroups.og.length ? (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {badgeGroups.og.map(renderBadge)}
+                </div>
+              ) : null}
+
+              {badgeGroups.events.length ? (
+                <section style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 10, background: "#fffafc" }}>
+                  <button type="button" className="button secondary" onClick={() => setEventBadgesOpen((v) => !v)}>
+                    {eventBadgesOpen ? "Hide Event Badges" : `Show Event Badges (${badgeGroups.events.length})`}
+                  </button>
+                  {eventBadgesOpen ? <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>{badgeGroups.events.map(renderBadge)}</div> : null}
+                </section>
+              ) : null}
+
+              {badgeGroups.voted.length ? (
+                <section style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 10, background: "#fffafc" }}>
+                  <button type="button" className="button secondary" onClick={() => setVotedBadgesOpen((v) => !v)}>
+                    {votedBadgesOpen ? "Hide Voted 🗳️ Badges" : `Show Voted 🗳️ Badges (${badgeGroups.voted.length})`}
+                  </button>
+                  {votedBadgesOpen ? <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>{badgeGroups.voted.map(renderBadge)}</div> : null}
+                </section>
+              ) : null}
+
+              {badgeGroups.other.length ? <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{badgeGroups.other.map(renderBadge)}</div> : null}
+            </div>
+          ) : null}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+            {!isSelf && !isFriend ? <button className="button" onClick={addFriend}>Add Friend</button> : null}
+            {!isSelf && isFriend ? <Link className="button secondary" href={`/messages?thread=${encodeURIComponent(memberId)}`}>Chat</Link> : null}
+          </div>
           {status ? <p style={{ marginTop: 12, opacity: 0.8 }}>{status}</p> : null}
         </section>
       </div>

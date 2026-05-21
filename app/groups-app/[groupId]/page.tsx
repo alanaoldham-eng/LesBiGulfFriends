@@ -90,10 +90,10 @@ function MessageCard({
   const isEditing = editingId === String(m.id);
 
   return (
-    <div style={{ marginBottom: 14, paddingLeft: m.parent_message_id ? 20 : 0, borderLeft: m.parent_message_id ? "3px solid #f1dfe8" : "none" }}>
-      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-        {mainPhoto ? <img src={mainPhoto} alt={m.profile?.display_name || "Member"} style={{ width: 38, height: 38, borderRadius: 999, objectFit: "cover", border: "1px solid #ead5df" }} /> : null}
-        <div style={{ flex: 1 }}>
+    <div className="thread-card" style={{ marginBottom: 14, paddingLeft: m.parent_message_id ? 10 : 0, borderLeft: m.parent_message_id ? "3px solid #f1dfe8" : "none", minWidth: 0 }}>
+      <div className="thread-row" style={{ display: "flex", gap: 10, alignItems: "flex-start", minWidth: 0 }}>
+        {mainPhoto ? <img src={mainPhoto} alt={m.profile?.display_name || "Member"} style={{ width: 38, height: 38, minWidth: 38, borderRadius: 999, objectFit: "cover", border: "1px solid #ead5df" }} /> : null}
+        <div className="thread-content" style={{ flex: 1, minWidth: 0, maxWidth: "100%" }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <Link href={`/members/${m.sender_id}`} style={{ color: "#8d2d5d", fontWeight: 700 }}>
               {m.sender_id === me ? "You" : m.profile?.display_name || m.sender_id}
@@ -113,10 +113,10 @@ function MessageCard({
             </div>
           ) : (
             <>
-              {m.body ? <div style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{m.body}</div> : null}
+              {m.body ? <div className="thread-body" style={{ whiteSpace: "pre-wrap", marginTop: 4, overflowWrap: "anywhere", wordBreak: "break-word", maxWidth: "100%" }}>{m.body}</div> : null}
               {m.link_url ? (
                 <div style={{ marginTop: 6 }}>
-                  <a href={m.link_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>
+                  <a href={m.link_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline", overflowWrap: "anywhere", wordBreak: "break-word" }}>
                     {m.link_url}
                   </a>
                 </div>
@@ -124,7 +124,7 @@ function MessageCard({
               {m.media_url ? (
                 <div style={{ marginTop: 8 }}>
                   {String(m.media_type || "").startsWith("image/") ? (
-                    <img src={m.media_url} alt="Attachment" style={{ maxWidth: "100%", borderRadius: 14, border: "1px solid #ead5df" }} />
+                    <img className="thread-media" src={m.media_url} alt="Attachment" loading="lazy" style={{ maxWidth: "100%", width: "100%", height: "auto", borderRadius: 14, border: "1px solid #ead5df" }} />
                   ) : (
                     <a href={m.media_url} target="_blank" rel="noreferrer" style={{ color: "#8d2d5d", textDecoration: "underline" }}>
                       Open attachment
@@ -135,7 +135,7 @@ function MessageCard({
             </>
           )}
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+          <div className="thread-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
             <button type="button" className="button secondary" onClick={() => onReplyStart(String(m.id))}>Reply</button>
             {EMOJIS.map((emoji) => (
               <ReactionRoster
@@ -166,7 +166,7 @@ function MessageCard({
           ) : null}
 
           {(m.children || []).map((child: any) => (
-            <div key={child.id} style={{ marginTop: 12 }}>
+            <div className="thread-child" key={child.id} style={{ marginTop: 12, minWidth: 0 }}>
               <MessageCard
                 m={child}
                 me={me}
@@ -290,7 +290,6 @@ export default function GroupThreadPage() {
 
     try {
       await banMember(removeTargetUserId, reason);
-
       setRemoveTargetUserId(null);
       setStatus("Member removed and banned.");
       await refresh(me);

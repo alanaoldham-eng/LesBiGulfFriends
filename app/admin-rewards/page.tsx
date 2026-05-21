@@ -4,8 +4,9 @@ export const dynamic = "force-dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { ClientShell } from "../../components/ClientShell";
 import { getCurrentUser } from "../../lib/auth";
-import { banMember, grantBadge, listBadgesForUser, listProfilesForAdmin, rewardUserKarma } from "../../lib/db";
+import { banMember, grantBadge, listBadgesForUser, listProfilesForAdmin, rewardUserKarma, setMemberModerator } from "../../lib/db";
 import { supabase } from "../../lib/supabase/client";
+import { profile } from "console";
 
 const ADMIN_EMAIL = "alanaoldham@gmail.com";
 
@@ -104,6 +105,18 @@ export default function AdminRewardsPage() {
     }
   };
 
+  const toggleModerator = async (userId: string, currentlyMod: boolean) => {
+  try {
+    await setMemberModerator(userId, !currentlyMod);
+    setStatus(currentlyMod ? "Moderator privileges removed." : "Moderator privileges granted.");
+
+    const rows = await listProfilesForAdmin().catch(() => []);
+    setProfiles(rows);
+  } catch (e: any) {
+    setStatus(e.message || "Unable to update moderator status.");
+  }
+};
+
   return (
     <ClientShell>
       <section className="hero">
@@ -126,7 +139,6 @@ export default function AdminRewardsPage() {
             <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Reason" style={{ minHeight: 120, padding: "14px 16px", borderRadius: 16, border: "1px solid #d7a8bf", fontSize: 16 }} />
             <button className="button" onClick={reward} disabled={!selectedUserId || !amount || !note.trim()}>Grant karma</button>
           </div>
-
           <div style={{ height: 16 }} />
           <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff7fb" }}>
             <h3 style={{ marginTop: 0 }}>Remove / Ban member</h3>
@@ -152,7 +164,12 @@ export default function AdminRewardsPage() {
                 {removingUser ? "Removing..." : "Remove and ban member"}
               </button>
             </div>
-          </section>
+            <div style={{ height: 16 }} />
+            <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff7fb" }}>
+              <h3 style={{ marginTop: 0 }}>Toggle moderator status</h3>
+              <button className="button secondary" onClick={() => toggleModerator(profile.id, !!profile.is_moderator)} {profile.is_moderator ? "Remove Mod" : "Make Mod"}</button>
+              </section>
+
 
           <div style={{ height: 16 }} />
           <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>

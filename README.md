@@ -1,14 +1,14 @@
-# v088.1 Remove Button Build Fix
-
-This patch fixes `app/groups-app/[groupId]/page.tsx`.
-
-The previous patch accidentally placed `removeAndBanMember` and `visibleMessages`
-at the top level of the module, outside the React component. This moved
-`removeAndBanMember` inside `GroupThreadPage`, where `removeTargetUserId`,
-`setStatus`, `refresh`, and `me` exist.
+# v090 Responsive UX + Badge Ordering Patch
 
 Apply:
-1. Unzip into your repo root and overwrite files.
+1. Unzip into repo root and overwrite files.
 2. Run `npm run build`.
 
-If you have not already run the v088 SQL, run it first.
+Includes:
+- Responsive/native-mobile polish for thread layout.
+- Fixes iPhone nested group threads being cut off by reducing nested indentation and forcing text/media wrapping.
+- Adds lazy loading and full-width responsive media in group threads.
+- OG badges always show first.
+- Event badges are collapsed by default and expand in descending date order.
+- Voted 🗳️ badges are collapsed by default and expand in descending deadline/date order.
+- Keeps banned/removed profile unavailable behavior from v088.
