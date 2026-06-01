@@ -1,16 +1,31 @@
-# v095.2 Krewe Vibe Build Fix
+# v095.3 Krewe Vibe Permissions + Hint Removal
 
-Apply:
-1. Unzip into repo root and overwrite files.
-2. Run:
+Apply order:
+
+1. Run this in Supabase:
+
+```sql
+sql/v095_3_krewe_vibe_permissions.sql
+```
+
+2. Unzip into repo root and overwrite files.
+
+3. Build:
 
 ```powershell
 npm run build
 ```
 
 Fixes:
-- `lib/kreweVibe.ts` TypeScript build error:
-  - removed `.catch()` from the Supabase RPC builder
-  - replaced it with `try/catch` around `await supabase.rpc(...)`
-- Changes Krewe Vibe intro text to:
-  - `Check compatibility`
+
+## Save error
+Fixes:
+
+```text
+permission denied for table member_questions
+```
+
+The issue was database permissions. RLS policies existed, but authenticated users also need table privileges.
+
+## Removes answer hints
+The Krewe Vibe page no longer displays helper text that revealed the “good” answers. The internal scoring logic still remains hidden.

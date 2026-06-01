@@ -162,8 +162,6 @@ export default function KreweVibePage() {
           )}
         </div>
 
-        {question.helper_text ? <p style={{ marginTop: 0, opacity: 0.75 }}>{question.helper_text}</p> : null}
-
         {question.answer_type === "single_choice" ? (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {(question.options || []).map((option: string) => (
