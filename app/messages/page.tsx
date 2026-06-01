@@ -28,16 +28,6 @@ async function loadDmPage(me: string, otherId: string, before?: string | null) {
   return { rows: rows.slice(0, PAGE_SIZE), hasMore: rows.length > PAGE_SIZE };
 }
 
-async function getLastMessageAt(me: string, otherId: string) {
-  const { data } = await supabase
-    .from("messages")
-    .select("created_at")
-    .or(`and(sender_id.eq.${me},recipient_id.eq.${otherId}),and(sender_id.eq.${otherId},recipient_id.eq.${me})`)
-    .order("created_at", { ascending: false })
-    .limit(1);
-  return data?.[0]?.created_at || null;
-}
-
 function MessageItem({ m, mine, onEdit, onDelete }: any) {
   return (
     <div style={{ marginBottom: 12, borderBottom: "1px solid #f3e6ed", padding: "10px 10px 12px 10px", borderRadius: 12, background: "#fff" }}>
@@ -74,13 +64,14 @@ function MessagesInner() {
 
   const loadFriendsSorted = async (userId: string) => {
     const friendRows = await listFriends(userId).catch(() => []);
-    const enriched = await Promise.all((friendRows || []).map(async (f: any) => ({ ...f, lastMessageAt: await getLastMessageAt(userId, f.id) })));
-    enriched.sort((a: any, b: any) => {
+
+    const enriched = [...(friendRows || [])].sort((a: any, b: any) => {
       if (a.lastMessageAt && b.lastMessageAt) return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
       if (a.lastMessageAt) return -1;
       if (b.lastMessageAt) return 1;
       return Number(b.karma_points || 0) - Number(a.karma_points || 0);
     });
+
     setFriends(enriched);
   };
 

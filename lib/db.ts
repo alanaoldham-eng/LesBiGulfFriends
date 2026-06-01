@@ -114,24 +114,39 @@ export async function declineFriendRequest(requestId: string) {
   if (error) throw error;
 }
 
+
 export async function listFriends(me: string) {
-  const { data, error } = await supabase
+  const { data, error } = await supabase.rpc("get_friends_with_latest_message_rpc", {
+    _user_id: me,
+  });
+
+  if (!error && Array.isArray(data)) {
+    return data.filter(isVisibleProfile);
+  }
+
+  // Fallback keeps app working if SQL has not been applied yet.
+  const { data: rowsData, error: friendsError } = await supabase
     .from("friends")
     .select("*")
     .or(`user_a.eq.${me},user_b.eq.${me}`)
     .order("created_at", { ascending: false });
-  if (error) throw error;
-  const rows = data || [];
+
+  if (friendsError) throw friendsError;
+
+  const rows = rowsData || [];
   const friendIds = rows.map((r: any) => (r.user_a === me ? r.user_b : r.user_a));
   if (!friendIds.length) return [];
-  const { data: profiles, error: pe } = await supabase
+
+  const { data: profiles, error: profileError } = await supabase
     .from("profiles")
     .select("*")
     .in("id", friendIds)
     .eq("is_banned", false)
     .neq("membership_status", "removed")
     .neq("membership_status", "banned");
-  if (pe) throw pe;
+
+  if (profileError) throw profileError;
+
   return (profiles || []).filter(isVisibleProfile);
 }
 
@@ -208,7 +223,7 @@ export async function listGroupMessages(group_id: string) {
     .select("*")
     .eq("group_id", group_id)
     .order("created_at", { ascending: false })
-    .limit(300);
+    .limit(75);
   if (error) throw error;
   return data || [];
 }
@@ -311,27 +326,43 @@ export async function getMyGroupMembership(groupId: string, userId: string) {
   return data;
 }
 
+
 export async function listGroupMembers(groupId: string) {
-  const { data: memberships, error } = await supabase
+  const { data, error } = await supabase.rpc("get_group_members_with_profiles_rpc", {
+    _group_id: groupId,
+  });
+
+  if (!error && Array.isArray(data)) {
+    return data.filter((m: any) => !!m.profile && isVisibleProfile(m.profile));
+  }
+
+  // Fallback keeps app working if SQL has not been applied yet.
+  const { data: memberships, error: membershipError } = await supabase
     .from("group_members")
     .select("*")
     .eq("group_id", groupId)
     .order("created_at", { ascending: true });
-  if (error) throw error;
+
+  if (membershipError) throw membershipError;
+
   const userIds = (memberships || []).map((m: any) => m.user_id);
   let profiles: any[] = [];
+
   if (userIds.length) {
-    const { data: profs, error: pe } = await supabase
+    const { data: profs, error: profileError } = await supabase
       .from("profiles")
-      .select("id, display_name, photo_url, photo_urls, karma_points, membership_status, is_banned")
+      .select("id, display_name, photo_url, photo_urls, karma_points, membership_status, is_banned, is_moderator")
       .in("id", userIds)
       .eq("is_banned", false)
       .neq("membership_status", "removed")
       .neq("membership_status", "banned");
-    if (pe) throw pe;
+
+    if (profileError) throw profileError;
     profiles = profs || [];
   }
+
   const profileMap = new Map(profiles.filter(isVisibleProfile).map((p: any) => [p.id, p]));
+
   return (memberships || [])
     .map((m: any) => ({ ...m, profile: profileMap.get(m.user_id) || null }))
     .filter((m: any) => !!m.profile)
@@ -446,25 +477,40 @@ export async function listPublicGroups() {
   return data || [];
 }
 
+
 export async function getPublicAndMemberGroups(userId: string) {
+  const { data, error } = await supabase.rpc("get_public_and_member_groups_rpc", {
+    _user_id: userId,
+  });
+
+  if (!error && Array.isArray(data)) {
+    return data;
+  }
+
+  // Fallback keeps app working if SQL has not been applied yet.
   const [publicGroups, myGroups] = await Promise.all([
     listPublicGroups().catch(() => []),
     listMyGroups(userId).catch(() => []),
   ]);
+
   const map = new Map<string, any>();
   [...publicGroups, ...myGroups].forEach((g: any) => map.set(g.id, g));
   const groups = Array.from(map.values());
   if (!groups.length) return groups;
+
   const groupIds = groups.map((g: any) => g.id);
   const { data: latestMessages } = await supabase
     .from("group_messages")
     .select("group_id, created_at")
     .in("group_id", groupIds)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(200);
+
   const latestByGroup = new Map<string, string>();
   (latestMessages || []).forEach((row: any) => {
     if (!latestByGroup.has(row.group_id)) latestByGroup.set(row.group_id, row.created_at);
   });
+
   return groups.sort((a: any, b: any) => {
     const aMain = String(a.name || "").toLowerCase() === "main";
     const bMain = String(b.name || "").toLowerCase() === "main";
@@ -482,18 +528,46 @@ export async function getFriendIds(me: string): Promise<Set<string>> {
   return new Set<string>((rows || []).map((x: any) => String(x.id)));
 }
 
+
 export async function getIncomingFriendRequests(me: string) {
-  const requests = await listFriendRequests();
-  const incoming = (requests || []).filter((r: any) => r.to_user === me && r.status === "pending");
-  const senderIds = incoming.map((r: any) => r.from_user);
-  let profiles: any[] = [];
-  if (senderIds.length) {
-    const { data, error } = await supabase.from("profiles").select("*").in("id", senderIds);
-    if (error) throw error;
-    profiles = data || [];
+  const { data, error } = await supabase.rpc("get_incoming_friend_requests_rpc", {
+    _user_id: me,
+  });
+
+  if (!error && Array.isArray(data)) {
+    return data;
   }
-  const map = new Map(profiles.map((p: any) => [p.id, p]));
-  return incoming.map((r: any) => ({ ...r, from_profile: map.get(r.from_user) || null }));
+
+  // Fallback keeps app working if SQL has not been applied yet.
+  const { data: incoming, error: requestError } = await supabase
+    .from("friend_requests")
+    .select("id, from_user, to_user, status, created_at")
+    .eq("to_user", me)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  if (requestError) throw requestError;
+
+  const senderIds = (incoming || []).map((r: any) => r.from_user);
+  let profiles: any[] = [];
+
+  if (senderIds.length) {
+    const { data: profileRows, error: profileError } = await supabase
+      .from("profiles")
+      .select("*")
+      .in("id", senderIds)
+      .eq("is_banned", false)
+      .neq("membership_status", "removed")
+      .neq("membership_status", "banned");
+
+    if (profileError) throw profileError;
+    profiles = profileRows || [];
+  }
+
+  const map = new Map(profiles.filter(isVisibleProfile).map((p: any) => [p.id, p]));
+  return (incoming || [])
+    .map((r: any) => ({ ...r, from_profile: map.get(r.from_user) || null }))
+    .filter((r: any) => !!r.from_profile);
 }
 
 export async function getProfileMessagesProfiles(senderIds: string[]) {
@@ -551,7 +625,7 @@ export async function listEventMessages(event_id: string) {
     .select("*")
     .eq("event_id", event_id)
     .order("created_at", { ascending: false })
-    .limit(300);
+    .limit(75);
   if (error) throw error;
   return data || [];
 }
@@ -1023,6 +1097,7 @@ export function isProfileComplete(profile: Partial<Profile> | null | undefined) 
   const hasPhoto = !!(profile.photo_url || (profile.photo_urls && profile.photo_urls.length));
   return hasName && hasPhoto;
 }
+
 
 export async function setMemberModerator(userId: string, enabled: boolean) {
   const { data, error } = await supabase.rpc("set_member_moderator_rpc", {
