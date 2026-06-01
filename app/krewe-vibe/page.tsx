@@ -35,12 +35,17 @@ export default function KreweVibePage() {
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(true);
   const [completion, setCompletion] = useState({ answeredCount: 0, requiredCount: 18, complete: false });
 
   useEffect(() => {
     const run = async () => {
+      setLoading(true);
       const user = await getCurrentUser().catch(() => null);
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
       setMe(user.id);
 
@@ -59,6 +64,7 @@ export default function KreweVibePage() {
       }
 
       setAnswers(next);
+      setLoading(false);
     };
 
     run();
@@ -89,6 +95,11 @@ export default function KreweVibePage() {
 
   const saveAll = async () => {
     if (!me || saving) return;
+
+    if (!questions.length) {
+      setStatus("Krewe Vibe questions are not loaded yet. Run the v095.1 SQL patch in Supabase, then refresh this page.");
+      return;
+    }
 
     setSaving(true);
     setStatus("");
@@ -203,9 +214,7 @@ export default function KreweVibePage() {
       <section className="hero">
         <h1 style={{ margin: 0, fontSize: 30 }}>Krewe Vibe</h1>
         <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.9 }}>
-          This works best when it feels like a conversation on the front porch, not a police
-          interrogation under fluorescent lights. The goal is kindness, reliability, emotional
-          maturity, and social awareness.
+          Check compatibility
         </p>
       </section>
 
@@ -218,6 +227,22 @@ export default function KreweVibePage() {
           </p>
         </section>
 
+        {loading ? (
+          <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
+            <h3 style={{ marginTop: 0 }}>Loading questions...</h3>
+            <p style={{ marginBottom: 0, opacity: 0.75 }}>The Krewe is setting out chairs on the porch.</p>
+          </section>
+        ) : null}
+
+        {!loading && !questions.length ? (
+          <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff7fb" }}>
+            <h3 style={{ marginTop: 0 }}>Questions are not loaded</h3>
+            <p style={{ marginBottom: 0, opacity: 0.8 }}>
+              Run <strong>sql/v095_1_krewe_vibe_bugfix.sql</strong> in Supabase, then refresh this page.
+            </p>
+          </section>
+        ) : null}
+
         {grouped.map(([section, sectionQuestions]) => (
           <div key={section} className="grid">
             <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff7fb" }}>
@@ -228,7 +253,7 @@ export default function KreweVibePage() {
           </div>
         ))}
 
-        <button className="button" onClick={saveAll} disabled={saving || !me}>
+        <button className="button" onClick={saveAll} disabled={saving || !me || loading || !questions.length}>
           {saving ? "Saving..." : "Save Krewe Vibe"}
         </button>
       </div>

@@ -313,6 +313,23 @@ function mergeQuestionConfig(row: any): KreweQuestion {
 }
 
 export async function listKreweQuestions() {
+  // v095.2: use RPC first so the app can self-heal if the question rows were not seeded.
+  // Supabase's Postgrest builder is awaitable, but TypeScript does not expose .catch() on it.
+  let rpcData: any = null;
+  let rpcError: any = null;
+
+  try {
+    const { data, error } = await supabase.rpc("get_krewe_questions_rpc");
+    rpcData = data;
+    rpcError = error;
+  } catch (error: any) {
+    rpcError = error;
+  }
+
+  if (!rpcError && Array.isArray(rpcData) && rpcData.length) {
+    return rpcData.map(mergeQuestionConfig);
+  }
+
   const { data, error } = await supabase
     .from("member_questions")
     .select("*")

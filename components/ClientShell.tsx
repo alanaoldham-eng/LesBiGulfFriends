@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { signOutEverywhere, getCurrentUser } from "../lib/auth";
+import { getKreweCompletionStatus } from "../lib/kreweVibe";
 import { listInAppNotifications } from "../lib/notificationSettings";
 import { getViewerRoleFlags } from "../lib/roadmap";
-import { getKreweCompletionStatus } from "../lib/kreweVibe";
 import { supabase } from "../lib/supabase/client";
 
 const ADMIN_EMAIL = "alanaoldham@gmail.com";
@@ -53,7 +53,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const [kreweVibeComplete, setKreweVibeComplete] = useState(false);
   const [leftTarget, setLeftTarget] = useState<HTMLElement | null>(null);
   const [rightTarget, setRightTarget] = useState<HTMLElement | null>(null);
-  const shellRef = useRef<HTMLDivElement | null>(null);
+  const leftRef = useRef<HTMLDivElement | null>(null);
+  const rightRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setLeftTarget(document.getElementById("topbar-left-slot"));
@@ -96,25 +97,29 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const closeMenus = () => {
+    setMenuOpen(false);
+    setNotifOpen(false);
+    setProfileOpen(false);
+  };
+
   useEffect(() => {
     const onDocClick = (event: MouseEvent) => {
-      if (!shellRef.current) return;
-      if (!shellRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-        setNotifOpen(false);
-        setProfileOpen(false);
-      }
+      const target = event.target as Node;
+      const insideLeft = !!leftRef.current?.contains(target);
+      const insideRight = !!rightRef.current?.contains(target);
+
+      if (insideLeft || insideRight) return;
+      closeMenus();
     };
 
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  const closeMenus = () => {
-    setMenuOpen(false);
-    setNotifOpen(false);
-    setProfileOpen(false);
-  };
+  const kreweMenuStyle: React.CSSProperties = kreweVibeComplete
+    ? menuItemStyle
+    : { ...menuItemStyle, background: "#fff7fb", borderColor: "#d7a8bf", fontWeight: 900 };
 
   const menuPanel = menuOpen ? (
     <div
@@ -132,9 +137,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       <Link href="/groups-app" style={menuItemStyle} onClick={closeMenus}>Groups</Link>
       <Link href="/messages" style={menuItemStyle} onClick={closeMenus}>Messages</Link>
       <Link href="/friends" style={menuItemStyle} onClick={closeMenus}>Friends & Invites</Link>
-      {!kreweVibeComplete ? <Link href="/krewe-vibe" style={{ ...menuItemStyle, background: "#fff7fb", borderColor: "#d7a8bf", fontWeight: 900 }} onClick={closeMenus}>Complete Krewe Vibe</Link> : null}
+      {!kreweVibeComplete ? <Link href="/krewe-vibe" style={kreweMenuStyle} onClick={closeMenus}>Complete Krewe Vibe</Link> : null}
       <Link href="/friend-suggestions" style={menuItemStyle} onClick={closeMenus}>Friend Suggestions</Link>
-      <Link href="/krewe-vibe" style={{ ...menuItemStyle, background: kreweVibeComplete ? "#fff" : "#fff7fb", borderColor: kreweVibeComplete ? "#f1dfe8" : "#d7a8bf", fontWeight: kreweVibeComplete ? 400 : 900 }} onClick={closeMenus}>{kreweVibeComplete ? "Krewe Vibe" : "Complete Krewe Vibe"}</Link>
+      <Link href="/krewe-vibe" style={menuItemStyle} onClick={closeMenus}>Krewe Vibe</Link>
       <Link href="/events-app" style={menuItemStyle} onClick={closeMenus}>Events</Link>
       <Link href="/games" style={menuItemStyle} onClick={closeMenus}>Games</Link>
       <Link href="/confessions" style={menuItemStyle} onClick={closeMenus}>Confessions</Link>
@@ -207,14 +212,14 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     >
       <Link href={currentUserId ? `/members/${currentUserId}` : "/profile"} style={menuItemStyle} onClick={closeMenus}>View Profile</Link>
       <Link href="/profile" style={menuItemStyle} onClick={closeMenus}>Edit Profile</Link>
-      <Link href="/krewe-vibe" style={{ ...menuItemStyle, background: kreweVibeComplete ? "#fff" : "#fff7fb", borderColor: kreweVibeComplete ? "#f1dfe8" : "#d7a8bf", fontWeight: kreweVibeComplete ? 400 : 900 }} onClick={closeMenus}>{kreweVibeComplete ? "Krewe Vibe" : "Complete Krewe Vibe"}</Link>
+      <Link href="/krewe-vibe" style={kreweMenuStyle} onClick={closeMenus}>{kreweVibeComplete ? "Krewe Vibe" : "Complete Krewe Vibe"}</Link>
       <Link href="/forgot-password" style={menuItemStyle} onClick={closeMenus}>Change Password</Link>
       <button type="button" style={menuItemStyle} onClick={() => signOutEverywhere()}>Logout</button>
     </div>
   ) : null;
 
   const leftControls = (
-    <div ref={shellRef} className="topbar-left-controls">
+    <div ref={leftRef} className="topbar-left-controls">
       <div style={{ position: "relative" }}>
         <button
           className="topbar-icon-button"
@@ -234,7 +239,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   );
 
   const rightControls = (
-    <div className="topbar-right-controls">
+    <div ref={rightRef} className="topbar-right-controls">
       {isLoggedIn ? (
         <>
           <div style={{ position: "relative" }}>
