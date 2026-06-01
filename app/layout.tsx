@@ -14,6 +14,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <div className="shell">
           <header className="topbar">
+            <div id="topbar-left-slot" className="topbar-left-slot" />
+
             <Link href="/app" className="topbar-brand-wrap" aria-label="Les Bi Gulf Friends home">
               <Image
                 src="/logo.png"
@@ -26,14 +28,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <div className="brand">Les Bi Gulf Friends</div>
             </Link>
 
-            <div id="topbar-actions-slot" className="topbar-actions-slot" />
+            <div id="topbar-right-slot" className="topbar-right-slot" />
           </header>
 
           <main className="container">
             {children}
-            <div className="footer-note">
-              Start with the web app first. Native iOS and Android can come later with Expo.
-            </div>
           </main>
         </div>
       </body>

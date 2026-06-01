@@ -1,14 +1,26 @@
-# v091.1 Mobile Width Fix
+# v092 Native Mobile Navigation Patch
 
 Apply:
-1. Unzip into repo root and overwrite `app/globals.css`.
+1. Unzip into repo root and overwrite files.
 2. Run `npm run build`.
 3. Deploy and test on iPhone.
 
-Fixes:
-- Prevents horizontal page overflow.
-- Keeps hamburger, notification, and profile icons top-right and horizontal.
-- Stops long URLs/text from stretching the viewport.
-- Forces text, sections, messages, and media to wrap inside mobile width.
-- Makes textareas/inputs fit their parent cards.
-- Adds defensive fixes for flex children missing `min-width: 0`.
+Files:
+- `app/layout.tsx`
+- `components/ClientShell.tsx`
+- `app/globals.css`
+
+What changed:
+- Mobile header now behaves like a native app:
+  - hamburger left
+  - centered Les Bi Gulf Friends brand
+  - notifications right
+- Mobile gets a fixed bottom tab bar:
+  - Home
+  - Groups
+  - Events
+  - Messages
+  - Profile
+- Profile menu remains in the desktop header, but mobile uses the bottom Profile tab.
+- Keeps v091.1 overflow fixes.
+- Adds safe-area padding for iPhone bottom notch/home bar.

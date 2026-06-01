@@ -10,7 +10,7 @@ import { supabase } from "../lib/supabase/client";
 
 const ADMIN_EMAIL = "alanaoldham@gmail.com";
 
-const panelStyle: React.CSSProperties = {
+const panelBase: React.CSSProperties = {
   position: "absolute",
   top: 38,
   zIndex: 10001,
@@ -35,6 +35,9 @@ const menuItemStyle: React.CSSProperties = {
   fontSize: 13,
   lineHeight: 1.2,
   cursor: "pointer",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
 };
 
 export function ClientShell({ children }: { children: React.ReactNode }) {
@@ -46,11 +49,13 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUserId, setCurrentUserId] = useState("");
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
-  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [leftTarget, setLeftTarget] = useState<HTMLElement | null>(null);
+  const [rightTarget, setRightTarget] = useState<HTMLElement | null>(null);
+  const shellRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setPortalTarget(document.getElementById("topbar-actions-slot"));
+    setLeftTarget(document.getElementById("topbar-left-slot"));
+    setRightTarget(document.getElementById("topbar-right-slot"));
   }, []);
 
   useEffect(() => {
@@ -87,8 +92,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const onDocClick = (event: MouseEvent) => {
-      if (!wrapRef.current) return;
-      if (!wrapRef.current.contains(event.target as Node)) {
+      if (!shellRef.current) return;
+      if (!shellRef.current.contains(event.target as Node)) {
         setMenuOpen(false);
         setNotifOpen(false);
         setProfileOpen(false);
@@ -99,8 +104,110 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  const controls = (
-    <div ref={wrapRef} className="topbar-actions">
+  const closeMenus = () => {
+    setMenuOpen(false);
+    setNotifOpen(false);
+    setProfileOpen(false);
+  };
+
+  const menuPanel = menuOpen ? (
+    <div
+      className="topbar-menu-panel"
+      style={{
+        ...panelBase,
+        left: 0,
+        width: 238,
+        maxWidth: "calc(100vw - 22px)",
+        display: "grid",
+        gap: 7,
+      }}
+    >
+      <Link href="/app" style={menuItemStyle} onClick={closeMenus}>Home</Link>
+      <Link href="/groups-app" style={menuItemStyle} onClick={closeMenus}>Groups</Link>
+      <Link href="/messages" style={menuItemStyle} onClick={closeMenus}>Messages</Link>
+      <Link href="/friends" style={menuItemStyle} onClick={closeMenus}>Friends & Invites</Link>
+      <Link href="/friend-suggestions" style={menuItemStyle} onClick={closeMenus}>Friend Suggestions</Link>
+      <Link href="/krewe-vibe" style={menuItemStyle} onClick={closeMenus}>Krewe Vibe</Link>
+      <Link href="/events-app" style={menuItemStyle} onClick={closeMenus}>Events</Link>
+      <Link href="/games" style={menuItemStyle} onClick={closeMenus}>Games</Link>
+      <Link href="/confessions" style={menuItemStyle} onClick={closeMenus}>Confessions</Link>
+      <Link href="/warning-wall" style={menuItemStyle} onClick={closeMenus}>The Warning Wall</Link>
+      <Link href="/availability" style={menuItemStyle} onClick={closeMenus}>Availability</Link>
+      {(canReview || isAdmin) ? <Link href="/proposals" style={menuItemStyle} onClick={closeMenus}>Proposals</Link> : null}
+      {(canReview || isAdmin) ? <Link href="/waiting-room" style={menuItemStyle} onClick={closeMenus}>Waiting Room</Link> : null}
+      <Link href="/feedback" style={menuItemStyle} onClick={closeMenus}>Bug / Feature</Link>
+      {isAdmin ? <Link href="/admin-rewards" style={menuItemStyle} onClick={closeMenus}>Admin Magic Wand</Link> : null}
+      {isLoggedIn ? <button type="button" style={menuItemStyle} onClick={() => signOutEverywhere()}>Logout</button> : null}
+    </div>
+  ) : null;
+
+  const notificationPanel = notifOpen ? (
+    <div
+      className="topbar-notification-panel"
+      style={{
+        ...panelBase,
+        right: 0,
+        width: 320,
+        maxWidth: "calc(100vw - 22px)",
+        maxHeight: 420,
+        overflow: "auto",
+      }}
+    >
+      <div style={{ fontWeight: 800, marginBottom: 10 }}>Notifications</div>
+      {notifications.length ? (
+        <div style={{ display: "grid", gap: 9 }}>
+          {notifications.map((n: any) => (
+            <Link
+              key={n.id}
+              href={n.href}
+              onClick={closeMenus}
+              style={{
+                display: "block",
+                padding: 11,
+                borderRadius: 13,
+                border: "1px solid #f1dfe8",
+                background: "#fff8fb",
+                textDecoration: "none",
+                color: "inherit",
+              }}
+            >
+              <div style={{ fontWeight: 650, lineHeight: 1.4 }}>{n.text}</div>
+              {n.created_at ? (
+                <div style={{ fontSize: 12, opacity: 0.65, marginTop: 6 }}>
+                  {new Date(n.created_at).toLocaleString()}
+                </div>
+              ) : null}
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <p style={{ margin: 0, opacity: 0.75 }}>No new notifications.</p>
+      )}
+    </div>
+  ) : null;
+
+  const profilePanel = profileOpen ? (
+    <div
+      className="topbar-profile-panel"
+      style={{
+        ...panelBase,
+        right: 0,
+        width: 210,
+        maxWidth: "calc(100vw - 22px)",
+        display: "grid",
+        gap: 7,
+      }}
+    >
+      <Link href={currentUserId ? `/members/${currentUserId}` : "/profile"} style={menuItemStyle} onClick={closeMenus}>View Profile</Link>
+      <Link href="/profile" style={menuItemStyle} onClick={closeMenus}>Edit Profile</Link>
+      <Link href="/krewe-vibe" style={menuItemStyle} onClick={closeMenus}>Krewe Vibe</Link>
+      <Link href="/forgot-password" style={menuItemStyle} onClick={closeMenus}>Change Password</Link>
+      <button type="button" style={menuItemStyle} onClick={() => signOutEverywhere()}>Logout</button>
+    </div>
+  ) : null;
+
+  const leftControls = (
+    <div ref={shellRef} className="topbar-left-controls">
       <div style={{ position: "relative" }}>
         <button
           className="topbar-icon-button"
@@ -114,35 +221,13 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         >
           ☰
         </button>
-
-        {menuOpen ? (
-          <div
-            style={{
-              ...panelStyle,
-              right: 0,
-              minWidth: 238,
-              maxWidth: "calc(100vw - 18px)",
-              display: "grid",
-              gap: 7,
-            }}
-          >
-            <Link href="/app" style={menuItemStyle}>Home</Link>
-            <Link href="/groups-app" style={menuItemStyle}>Groups</Link>
-            <Link href="/messages" style={menuItemStyle}>Messages</Link>
-            <Link href="/friends" style={menuItemStyle}>Friends & Invites</Link>
-            <Link href="/events-app" style={menuItemStyle}>Events</Link>
-            <Link href="/games" style={menuItemStyle}>Games</Link>
-            <Link href="/confessions" style={menuItemStyle}>Confessions</Link>
-            <Link href="/warning-wall" style={menuItemStyle}>The Warning Wall</Link>
-            <Link href="/availability" style={menuItemStyle}>Availability</Link>
-            {(canReview || isAdmin) ? <Link href="/proposals" style={menuItemStyle}>Proposals</Link> : null}
-            {(canReview || isAdmin) ? <Link href="/waiting-room" style={menuItemStyle}>Waiting Room</Link> : null}
-            <Link href="/feedback" style={menuItemStyle}>Bug / Feature</Link>
-            {isAdmin ? <Link href="/admin-rewards" style={menuItemStyle}>Admin Magic Wand</Link> : null}
-          </div>
-        ) : null}
+        {menuPanel}
       </div>
+    </div>
+  );
 
+  const rightControls = (
+    <div className="topbar-right-controls">
       {isLoggedIn ? (
         <>
           <div style={{ position: "relative" }}>
@@ -159,74 +244,15 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             >
               🔔
               {notifications.length ? (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: -6,
-                    right: -6,
-                    minWidth: 17,
-                    height: 17,
-                    padding: "0 5px",
-                    borderRadius: 999,
-                    background: "#8d2d5d",
-                    color: "#fff",
-                    fontSize: 10,
-                    fontWeight: 800,
-                    lineHeight: "17px",
-                    textAlign: "center",
-                  }}
-                >
+                <span className="topbar-badge">
                   {notifications.length}
                 </span>
               ) : null}
             </button>
-
-            {notifOpen ? (
-              <div
-                style={{
-                  ...panelStyle,
-                  right: -36,
-                  width: 330,
-                  maxWidth: "calc(100vw - 18px)",
-                  maxHeight: 420,
-                  overflow: "auto",
-                }}
-              >
-                <div style={{ fontWeight: 800, marginBottom: 10 }}>Notifications</div>
-                {notifications.length ? (
-                  <div style={{ display: "grid", gap: 9 }}>
-                    {notifications.map((n: any) => (
-                      <Link
-                        key={n.id}
-                        href={n.href}
-                        onClick={() => setNotifOpen(false)}
-                        style={{
-                          display: "block",
-                          padding: 11,
-                          borderRadius: 13,
-                          border: "1px solid #f1dfe8",
-                          background: "#fff8fb",
-                          textDecoration: "none",
-                          color: "inherit",
-                        }}
-                      >
-                        <div style={{ fontWeight: 650, lineHeight: 1.4 }}>{n.text}</div>
-                        {n.created_at ? (
-                          <div style={{ fontSize: 12, opacity: 0.65, marginTop: 6 }}>
-                            {new Date(n.created_at).toLocaleString()}
-                          </div>
-                        ) : null}
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <p style={{ margin: 0, opacity: 0.75 }}>No new notifications.</p>
-                )}
-              </div>
-            ) : null}
+            {notificationPanel}
           </div>
 
-          <div style={{ position: "relative" }}>
+          <div className="desktop-profile-menu" style={{ position: "relative" }}>
             <button
               className="topbar-icon-button"
               onClick={() => {
@@ -239,30 +265,60 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             >
               👤
             </button>
-
-            {profileOpen ? (
-              <div style={{ ...panelStyle, right: 0, minWidth: 210, display: "grid", gap: 7 }}>
-                <Link href={currentUserId ? `/members/${currentUserId}` : "/profile"} style={menuItemStyle}>View Profile</Link>
-                <Link href="/profile" style={menuItemStyle}>Edit Profile</Link>
-                <Link href="/forgot-password" style={menuItemStyle}>Change Password</Link>
-                <button type="button" style={menuItemStyle} onClick={() => signOutEverywhere()}>Logout</button>
-              </div>
-            ) : null}
+            {profilePanel}
           </div>
         </>
       ) : (
-        <>
+        <div className="desktop-auth-actions">
           <Link href="/login" className="button secondary">Log in</Link>
           <Link href="/signup" className="button">Sign up</Link>
-        </>
+        </div>
       )}
     </div>
   );
 
+  const bottomNav = isLoggedIn ? (
+    <nav className="mobile-bottom-nav" aria-label="Primary mobile navigation">
+      <Link href="/app" className="mobile-bottom-nav-item" onClick={closeMenus}>
+        <span>🏠</span>
+        <span>Home</span>
+      </Link>
+      <Link href="/groups-app" className="mobile-bottom-nav-item" onClick={closeMenus}>
+        <span>👥</span>
+        <span>Groups</span>
+      </Link>
+      <Link href="/events-app" className="mobile-bottom-nav-item" onClick={closeMenus}>
+        <span>📅</span>
+        <span>Events</span>
+      </Link>
+      <Link href="/messages" className="mobile-bottom-nav-item" onClick={closeMenus}>
+        <span>💬</span>
+        <span>Messages</span>
+      </Link>
+      <Link href={currentUserId ? `/members/${currentUserId}` : "/profile"} className="mobile-bottom-nav-item" onClick={closeMenus}>
+        <span>👤</span>
+        <span>Profile</span>
+      </Link>
+    </nav>
+  ) : (
+    <nav className="mobile-bottom-nav mobile-bottom-nav-auth" aria-label="Mobile login navigation">
+      <Link href="/login" className="mobile-bottom-nav-item" onClick={closeMenus}>
+        <span>🔑</span>
+        <span>Log in</span>
+      </Link>
+      <Link href="/signup" className="mobile-bottom-nav-item" onClick={closeMenus}>
+        <span>✨</span>
+        <span>Sign up</span>
+      </Link>
+    </nav>
+  );
+
   return (
     <>
-      {portalTarget ? createPortal(controls, portalTarget) : null}
+      {leftTarget ? createPortal(leftControls, leftTarget) : null}
+      {rightTarget ? createPortal(rightControls, rightTarget) : null}
       {children}
+      {bottomNav}
     </>
   );
 }
