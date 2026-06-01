@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { signOutEverywhere, getCurrentUser } from "../lib/auth";
 import { listInAppNotifications } from "../lib/notificationSettings";
 import { getViewerRoleFlags } from "../lib/roadmap";
+import { getKreweCompletionStatus } from "../lib/kreweVibe";
 import { supabase } from "../lib/supabase/client";
 
 const ADMIN_EMAIL = "alanaoldham@gmail.com";
@@ -49,6 +50,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUserId, setCurrentUserId] = useState("");
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [kreweVibeComplete, setKreweVibeComplete] = useState(false);
   const [leftTarget, setLeftTarget] = useState<HTMLElement | null>(null);
   const [rightTarget, setRightTarget] = useState<HTMLElement | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
@@ -83,9 +85,13 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
         const roleFlags = await getViewerRoleFlags(user.id).catch(() => ({ canReview: false }));
         setCanReview(!!roleFlags?.canReview);
+
+        const vibe = await getKreweCompletionStatus(user.id).catch(() => ({ complete: false }));
+        setKreweVibeComplete(!!vibe.complete);
       } else {
         setNotifications([]);
         setCanReview(false);
+        setKreweVibeComplete(false);
       }
     });
   }, []);
@@ -126,8 +132,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       <Link href="/groups-app" style={menuItemStyle} onClick={closeMenus}>Groups</Link>
       <Link href="/messages" style={menuItemStyle} onClick={closeMenus}>Messages</Link>
       <Link href="/friends" style={menuItemStyle} onClick={closeMenus}>Friends & Invites</Link>
+      {!kreweVibeComplete ? <Link href="/krewe-vibe" style={{ ...menuItemStyle, background: "#fff7fb", borderColor: "#d7a8bf", fontWeight: 900 }} onClick={closeMenus}>Complete Krewe Vibe</Link> : null}
       <Link href="/friend-suggestions" style={menuItemStyle} onClick={closeMenus}>Friend Suggestions</Link>
-      <Link href="/krewe-vibe" style={menuItemStyle} onClick={closeMenus}>Krewe Vibe</Link>
+      <Link href="/krewe-vibe" style={{ ...menuItemStyle, background: kreweVibeComplete ? "#fff" : "#fff7fb", borderColor: kreweVibeComplete ? "#f1dfe8" : "#d7a8bf", fontWeight: kreweVibeComplete ? 400 : 900 }} onClick={closeMenus}>{kreweVibeComplete ? "Krewe Vibe" : "Complete Krewe Vibe"}</Link>
       <Link href="/events-app" style={menuItemStyle} onClick={closeMenus}>Events</Link>
       <Link href="/games" style={menuItemStyle} onClick={closeMenus}>Games</Link>
       <Link href="/confessions" style={menuItemStyle} onClick={closeMenus}>Confessions</Link>
@@ -200,7 +207,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     >
       <Link href={currentUserId ? `/members/${currentUserId}` : "/profile"} style={menuItemStyle} onClick={closeMenus}>View Profile</Link>
       <Link href="/profile" style={menuItemStyle} onClick={closeMenus}>Edit Profile</Link>
-      <Link href="/krewe-vibe" style={menuItemStyle} onClick={closeMenus}>Krewe Vibe</Link>
+      <Link href="/krewe-vibe" style={{ ...menuItemStyle, background: kreweVibeComplete ? "#fff" : "#fff7fb", borderColor: kreweVibeComplete ? "#f1dfe8" : "#d7a8bf", fontWeight: kreweVibeComplete ? 400 : 900 }} onClick={closeMenus}>{kreweVibeComplete ? "Krewe Vibe" : "Complete Krewe Vibe"}</Link>
       <Link href="/forgot-password" style={menuItemStyle} onClick={closeMenus}>Change Password</Link>
       <button type="button" style={menuItemStyle} onClick={() => signOutEverywhere()}>Logout</button>
     </div>

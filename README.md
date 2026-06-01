@@ -1,8 +1,8 @@
-# v094 Performance Patch
+# v095 Krewe Vibe Patch
 
 Apply order:
 
-1. Run `sql/v094_performance_indexes_and_rpcs.sql` in Supabase.
+1. Run `sql/v095_krewe_vibe.sql` in Supabase.
 2. Unzip this patch into your repo root and overwrite files.
 3. Run:
 
@@ -10,26 +10,30 @@ Apply order:
 npm run build
 ```
 
-What v094 fixes:
+Files included:
+- `sql/v095_krewe_vibe.sql`
+- `lib/kreweVibe.ts`
+- `app/krewe-vibe/page.tsx`
+- `app/friend-suggestions/page.tsx`
+- `components/ClientShell.tsx`
 
-## Database
-- Adds corrected indexes for the slow Supabase queries.
-- Uses `starts_at`, not `start_at`.
-- Uses `invitee_user_id`, not `user_id`, for `event_invites`.
-- Uses `recipient_user_id`, not `user_id`, for `in_app_notifications`.
+What this implements:
+- Seeds the 19 Krewe Vibe questions from the requirements.
+- Uses the existing simple `member_questions` and `member_answers` schema.
+- Adds RLS policies and performance indexes.
+- Adds in-app notifications for existing active members who have not started the questionnaire.
+- Adds a highlighted "Complete Krewe Vibe" prompt in navigation/profile menus when incomplete.
+- Adds `/krewe-vibe` questionnaire page.
+- Adds `/friend-suggestions` matching page.
+- Keeps internal scoring hidden from users.
 
-## N+1 fixes
-- `listFriends()` now uses `get_friends_with_latest_message_rpc()`.
-  - This removes the old pattern where the Messages page loaded one latest-message query per friend.
-- `getIncomingFriendRequests()` now uses `get_incoming_friend_requests_rpc()`.
-  - This avoids loading all friend requests and filtering client-side.
-- `listGroupMembers()` now uses `get_group_members_with_profiles_rpc()`.
-  - This returns group member rows and profile data in one DB call.
-- `getPublicAndMemberGroups()` now uses `get_public_and_member_groups_rpc()`.
-  - This collapses public groups, member groups, and latest group activity into one DB call.
+Scoring implemented internally:
+- +3 shared community values
+- +2 shared event preferences
+- +2 compatible communication style
+- +1 shared interests
+- -5 privacy/conflict red flags
 
-## Payload reduction
-- Group/event message fetch limits reduced from 300 to 75 to reduce initial page payload.
-
-## Safety
-Each optimized function includes a fallback to the previous query path if the SQL RPC has not been applied yet.
+Notes:
+- The questionnaire does not alone approve or reject members.
+- It is designed to support social observation, gradual trust-building, and moderation.
