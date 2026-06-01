@@ -791,7 +791,7 @@ export async function listProposalVotes(proposal_id: string) {
 export async function listProfilesForAdmin() {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, display_name, photo_url, photo_urls, karma_points, membership_status, is_banned, removed_at, removed_reason")
+    .select("id, display_name, photo_url, photo_urls, karma_points, membership_status, is_banned, is_moderator, removed_at, removed_reason")
     .order("display_name", { ascending: true });
   if (error) throw error;
   return data || [];
@@ -1024,19 +1024,12 @@ export function isProfileComplete(profile: Partial<Profile> | null | undefined) 
   return hasName && hasPhoto;
 }
 
-export async function setMemberModerator(
-  userId: string,
-  enabled: boolean
-) {
-  const { data, error } = await supabase.rpc(
-    "set_member_moderator_rpc",
-    {
-      _target_user_id: userId,
-      _enabled: enabled,
-    }
-  );
+export async function setMemberModerator(userId: string, enabled: boolean) {
+  const { data, error } = await supabase.rpc("set_member_moderator_rpc", {
+    _target_user_id: userId,
+    _enabled: enabled,
+  });
 
   if (error) throw error;
-
   return data;
 }
