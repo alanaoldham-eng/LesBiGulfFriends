@@ -1,194 +1,363 @@
-* { box-sizing: border-box; }
-html, body { padding: 0; margin: 0; }
+/* v091.1 mobile width + native-feel fix
+   This is intentionally global and defensive because several pages use inline styles.
+*/
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  padding: 0;
+  margin: 0;
+}
+
 body {
   font-family: Inter, Arial, Helvetica, sans-serif;
   background: linear-gradient(180deg, #fff8fb 0%, #fff 100%);
   color: #24161f;
 }
-a { color: inherit; text-decoration: none; }
-.container {
-  width: min(100%, 480px);
-  margin: 0 auto;
-  padding: 16px;
+
+a {
+  color: inherit;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+  height: auto;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+  max-width: 100%;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.shell,
+.container,
+main,
+#__next {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
 .shell {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
-.topbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-bottom: 1px solid #f1dfe8;
-  background: rgba(255,255,255,0.92);
-  position: sticky;
-  top: 0;
-  backdrop-filter: blur(8px);
-  z-index: 10;
+
+.container {
+  width: min(100%, 980px);
+  margin: 0 auto;
+  padding: 16px;
 }
+
+/* Header: logo left, icons horizontal right */
+.topbar {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  padding: 8px 10px !important;
+  border-bottom: 1px solid #f1dfe8 !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  position: sticky !important;
+  top: 0 !important;
+  backdrop-filter: blur(8px) !important;
+  z-index: 1000 !important;
+  overflow: visible !important;
+}
+
+.topbar-brand-wrap {
+  display: flex !important;
+  align-items: center !important;
+  gap: 9px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  color: inherit !important;
+  text-decoration: none !important;
+  overflow: hidden !important;
+}
+
 .brand {
   font-weight: 900;
   line-height: 1.1;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-size: 17px !important;
 }
+
 .brand-sub {
-  font-size: 12px;
-  opacity: 0.65;
+  display: none !important;
 }
+
+.topbar-actions-slot {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  min-height: 34px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+}
+
+.topbar-actions {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 7px !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  position: relative !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
+  flex-wrap: nowrap !important;
+}
+
+.topbar-actions > * {
+  flex: 0 0 auto !important;
+}
+
+.topbar-icon-button {
+  appearance: none !important;
+  border: 1px solid #d7a8bf !important;
+  border-radius: 11px !important;
+  background: #fff !important;
+  color: #8d2d5d !important;
+  font-weight: 900 !important;
+  width: 32px !important;
+  min-width: 32px !important;
+  max-width: 32px !important;
+  height: 32px !important;
+  padding: 5px 7px !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* General layout safety */
 .hero {
   padding: 20px 0 12px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
+
 .grid {
   display: grid;
   gap: 14px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
+
+section,
+.card,
+.thread,
+.thread-card,
+.message,
+.message-card,
+.post,
+.comment,
+form,
+fieldset {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+p,
+span,
+div,
+li,
+strong,
+em,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Flex overflow fix: long URLs/text cannot force page wider */
+[style*="display: flex"],
+[style*="display:flex"] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+[style*="display: flex"] > *,
+[style*="display:flex"] > * {
+  min-width: 0;
+}
+
+/* Forms and buttons */
 .button {
   appearance: none;
   border: none;
-  border-radius: 16px;
-  padding: 12px 16px;
+  border-radius: 12px !important;
+  padding: 7px 10px !important;
+  font-size: 13px !important;
+  line-height: 1.15 !important;
+  min-height: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  max-width: 100% !important;
   font-weight: 800;
   background: #8d2d5d;
   color: white;
   cursor: pointer;
+  white-space: normal;
 }
+
 .button.secondary {
-  background: transparent;
-  color: #8d2d5d;
-  border: 1px solid #d7a8bf;
+  background: #fff !important;
+  color: #8d2d5d !important;
+  border: 1px solid #d7a8bf !important;
 }
-.footer-note {
-  margin-top: 24px;
-  padding: 12px 0 28px;
-  font-size: 13px;
-  opacity: 0.7;
+
+button:disabled,
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
-.nav {
+
+/* Message/thread-specific mobile safety */
+.thread-row {
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+.thread-content {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.thread-body {
+  max-width: 100% !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  white-space: pre-wrap;
+}
+
+.thread-child {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin-left: 0 !important;
+}
+
+.thread-media,
+.message img,
+.post img,
+.comment img {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  object-fit: contain;
+}
+
+.thread-actions {
   display: flex;
-  gap: 10px;
   flex-wrap: wrap;
-  margin-top: 12px;
-  margin-bottom: 18px;
-}
-.nav a {
-  padding: 10px 12px;
-  border: 1px solid #ecdbe4;
-  border-radius: 999px;
-  background: #fff;
-  font-size: 14px;
-  font-weight: 700;
+  gap: 6px;
+  max-width: 100%;
 }
 
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 999px;
-  border: 1px solid #efcad8;
-  background: #fff;
-  font-size: 13px;
-  font-weight: 800;
-  color: #8d2d5d;
-}
-.landing-hero {
-  display: grid;
-  gap: 14px;
-  padding: 18px;
-  border: 1px solid #f1dfe8;
-  border-radius: 28px;
-  background:
-    radial-gradient(circle at top right, rgba(244, 182, 198, 0.35), transparent 35%),
-    linear-gradient(180deg, #fff6fa 0%, #fff 100%);
-  box-shadow: 0 14px 34px rgba(141,45,93,0.08);
-}
-.trust-row {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  font-size: 13px;
-  font-weight: 700;
-  opacity: 0.8;
-}
-.landing-secondary {
-  margin-top: 22px;
-  display: grid;
-  gap: 14px;
-}
-.onboarding-shell {
-  display: grid;
-  gap: 18px;
-}
-.onboarding-progress {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  margin-top: 8px;
-}
-.onboarding-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  background: #ead5df;
-}
-.onboarding-dot.active {
-  background: #8d2d5d;
-}
-.onboarding-card, .login-card {
-  border: 1px solid #f1dfe8;
-  border-radius: 28px;
-  padding: 22px 18px;
-  background:
-    radial-gradient(circle at top right, rgba(244, 182, 198, 0.28), transparent 34%),
-    linear-gradient(180deg, #fff7fb 0%, #fff 100%);
-  box-shadow: 0 14px 34px rgba(141,45,93,0.08);
-}
-.onboarding-emoji {
-  font-size: 44px;
-  line-height: 1;
-}
-.member-banner {
-  display: inline-flex;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: #f8e8ef;
-  color: #8d2d5d;
-  font-size: 13px;
-  font-weight: 800;
-  border: 1px solid #efcad8;
+.thread-actions .button,
+.thread-actions button {
+  padding: 6px 9px !important;
+  min-height: 30px !important;
+  font-size: 13px !important;
+  border-radius: 12px !important;
 }
 
-
-/* v083 menu-fit fix */
-.topbar-actions {
-  overflow: visible !important;
+/* Tables should scroll internally, not blow out mobile viewport */
+table {
+  max-width: 100%;
+  width: 100%;
 }
 
-.topbar-actions-slot {
-  overflow: visible !important;
+.table-wrap,
+[style*="overflow"] {
+  max-width: 100%;
 }
 
-.topbar {
-  overflow: visible !important;
-  z-index: 1000 !important;
-}
-
-.container,
-.shell {
-  overflow-x: clip;
-}
-
-/* v090 responsive/native-mobile polish */
-.container {
-  width: min(100%, 980px) !important;
-}
-
+/* Native-ish mobile polish */
 @media (max-width: 640px) {
+  html,
+  body {
+    overflow-x: hidden !important;
+  }
+
   .container {
     width: 100% !important;
+    max-width: 100% !important;
     padding: 12px !important;
+  }
+
+  .topbar {
+    padding: 7px 8px !important;
+    gap: 6px !important;
+  }
+
+  .topbar-brand-wrap {
+    gap: 7px !important;
+  }
+
+  .brand {
+    font-size: 15px !important;
+  }
+
+  .topbar-icon-button {
+    width: 30px !important;
+    min-width: 30px !important;
+    max-width: 30px !important;
+    height: 30px !important;
+    padding: 4px 6px !important;
+  }
+
+  .topbar-actions {
+    gap: 6px !important;
   }
 
   .hero {
@@ -206,63 +375,38 @@ a { color: inherit; text-decoration: none; }
   }
 
   section {
-    max-width: 100%;
-  }
-
-  .button,
-  .button.secondary,
-  button {
-    max-width: 100%;
+    border-radius: 18px !important;
   }
 
   .thread-card {
+    padding-left: 0 !important;
+    margin-left: 0 !important;
     max-width: 100% !important;
     overflow-x: hidden !important;
   }
 
+  .thread-card[style*="border-left"] {
+    padding-left: 8px !important;
+  }
+
   .thread-row {
     gap: 8px !important;
-    max-width: 100% !important;
   }
 
   .thread-content {
-    min-width: 0 !important;
-    max-width: calc(100vw - 92px) !important;
+    max-width: calc(100vw - 86px) !important;
   }
 
-  .thread-child {
-    margin-left: 0 !important;
-    max-width: 100% !important;
-  }
-
-  .thread-body {
+  textarea,
+  input,
+  select {
     font-size: 16px !important;
-    line-height: 1.38 !important;
-    overflow-wrap: anywhere !important;
-    word-break: break-word !important;
   }
 
-  .thread-actions {
-    gap: 6px !important;
-  }
-
-  .thread-actions .button,
-  .thread-actions button {
+  .button {
     padding: 6px 9px !important;
+    font-size: 12px !important;
     min-height: 30px !important;
-    font-size: 13px !important;
-    border-radius: 12px !important;
-  }
-
-  .thread-media {
-    width: 100% !important;
-    max-width: 100% !important;
-    height: auto !important;
-  }
-
-  .badge-stack .button {
-    width: 100%;
-    justify-content: center;
   }
 }
 

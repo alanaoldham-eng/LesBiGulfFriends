@@ -1,14 +1,14 @@
-# v090 Responsive UX + Badge Ordering Patch
+# v091.1 Mobile Width Fix
 
 Apply:
-1. Unzip into repo root and overwrite files.
+1. Unzip into repo root and overwrite `app/globals.css`.
 2. Run `npm run build`.
+3. Deploy and test on iPhone.
 
-Includes:
-- Responsive/native-mobile polish for thread layout.
-- Fixes iPhone nested group threads being cut off by reducing nested indentation and forcing text/media wrapping.
-- Adds lazy loading and full-width responsive media in group threads.
-- OG badges always show first.
-- Event badges are collapsed by default and expand in descending date order.
-- Voted 🗳️ badges are collapsed by default and expand in descending deadline/date order.
-- Keeps banned/removed profile unavailable behavior from v088.
+Fixes:
+- Prevents horizontal page overflow.
+- Keeps hamburger, notification, and profile icons top-right and horizontal.
+- Stops long URLs/text from stretching the viewport.
+- Forces text, sections, messages, and media to wrap inside mobile width.
+- Makes textareas/inputs fit their parent cards.
+- Adds defensive fixes for flex children missing `min-width: 0`.
