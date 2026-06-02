@@ -1,4 +1,4 @@
-# v095.4 Krewe Vibe Redirect Fix
+# v095.5 Krewe Vibe Redirect Hard Fix
 
 Apply:
 
@@ -8,8 +8,10 @@ npm run build
 ```
 
 Fix:
-- After a completed Krewe Vibe save, dismissing the success notice redirects the user to the Main group page.
-- If the Main group cannot be found, it falls back to `/groups-app`.
+- After Krewe Vibe is completed and saved, the page now automatically redirects to the Main group after a short success notice.
+- The Dismiss button also redirects.
+- Uses `router.push()` plus a `window.location.assign()` fallback in case the modal click timing swallows the client-side navigation.
+- If Main group ID cannot be found, fallback is `/groups-app`.
 
 File changed:
 - `app/krewe-vibe/page.tsx`

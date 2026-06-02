@@ -39,6 +39,7 @@ export default function KreweVibePage() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
   const [redirectAfterStatus, setRedirectAfterStatus] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [completion, setCompletion] = useState({ answeredCount: 0, requiredCount: 18, complete: false });
 
@@ -137,9 +138,15 @@ export default function KreweVibePage() {
       setRedirectAfterStatus(completed);
       setStatus(
         completed
-          ? "Krewe Vibe complete. Your answers will help us suggest better friends, events, and groups."
+          ? "Krewe Vibe complete. Redirecting to the Main group..."
           : "Krewe Vibe saved. You can come back and finish the remaining required questions."
       );
+
+      if (completed) {
+        window.setTimeout(() => {
+          void goToMainGroup();
+        }, 900);
+      }
     } catch (e: any) {
       setStatus(e.message || "Unable to save Krewe Vibe.");
     } finally {
@@ -148,18 +155,32 @@ export default function KreweVibePage() {
   };
 
 
-  const closeStatus = async () => {
+  const goToMainGroup = async () => {
+    if (redirecting) return;
+
+    setRedirecting(true);
     setStatus("");
 
-    if (!redirectAfterStatus) return;
-
     const mainGroupId = await getMainGroupId().catch(() => null);
+    const href = mainGroupId ? `/groups-app/${mainGroupId}` : "/groups-app";
 
-    if (mainGroupId) {
-      router.push(`/groups-app/${mainGroupId}`);
-    } else {
-      router.push("/groups-app");
+    router.push(href);
+
+    // Hard fallback for cases where router.push is swallowed by a modal click/event timing.
+    window.setTimeout(() => {
+      if (window.location.pathname !== href) {
+        window.location.assign(href);
+      }
+    }, 250);
+  };
+
+  const closeStatus = () => {
+    if (redirectAfterStatus) {
+      void goToMainGroup();
+      return;
     }
+
+    setStatus("");
   };
 
   const renderQuestion = (question: any) => {
