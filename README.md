@@ -1,4 +1,4 @@
-# v097.3 Featured Podcasts Landing Patch
+# v097.4 Landing Podcast Performance Patch
 
 Apply:
 
@@ -8,10 +8,10 @@ npm run build
 ```
 
 Changes:
-- Renames landing page section from "Featured this week" to "Featured Podcasts".
-- Shows 5 featured podcast sources on the landing page instead of 2.
-- Adds a "Load more podcasts" button when more than 5 featured sources exist.
-- Changes empty state copy to "No featured podcasts yet."
+- Featured Podcasts no longer shows "No featured podcasts yet" while the query is still loading.
+- Adds a lightweight loading skeleton for the podcast cards.
+- Loads featured podcasts separately from the rest of the landing page data so slower member/reception queries do not block the podcast section.
+- Caches featured podcasts in `sessionStorage` so returning to the landing page shows the last loaded podcast list immediately while refreshing in the background.
 
 File changed:
 - `app/app/page.tsx`

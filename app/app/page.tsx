@@ -26,6 +26,7 @@ export default function AppHomePage() {
   const [groupCount, setGroupCount] = useState(0);
   const [karmaPoints, setKarmaPoints] = useState(0);
   const [featuredSources, setFeaturedSources] = useState<any[]>([]);
+  const [featuredSourcesLoaded, setFeaturedSourcesLoaded] = useState(false);
   const [visiblePodcastCount, setVisiblePodcastCount] = useState(5);
   const [recentConfessions, setRecentConfessions] = useState<any[]>([]);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
@@ -38,11 +39,10 @@ export default function AppHomePage() {
       const user = await getCurrentUser().catch(() => null);
       if (!user) return;
 
-      const [friends, groups, profile, sources, confessions, roleFlags, waiting, vibe] = await Promise.all([
+      const [friends, groups, profile, confessions, roleFlags, waiting, vibe] = await Promise.all([
         listFriends(user.id).catch(() => []),
         listMyGroups(user.id).catch(() => []),
         getMyProfile(user.id).catch(() => null),
-        getFeaturedContentSources().catch(() => []),
         listConfessions(3).catch(() => []),
         getViewerRoleFlags(user.id).catch(() => ({ canReview: false })),
         listWaitingRoomCandidates().catch(() => []),
@@ -56,7 +56,6 @@ export default function AppHomePage() {
       setGroupCount(groups.length);
       setName(profile?.display_name || user.email?.split("@")[0] || "member");
       setKarmaPoints(Number(profile?.karma_points || 0));
-      setFeaturedSources(sources);
       setRecentConfessions(confessions);
       setNeedsOnboarding(!isProfileComplete(profile));
       setNeedsKreweVibe(!vibe.complete && String(profile?.membership_status || "").toLowerCase() === "waiting");
@@ -67,6 +66,29 @@ export default function AppHomePage() {
           : 0
       );
     };
+
+    const cachedPodcasts = window.sessionStorage.getItem("lbgf_featured_podcasts_v1");
+    if (cachedPodcasts) {
+      try {
+        const parsed = JSON.parse(cachedPodcasts);
+        if (Array.isArray(parsed)) {
+          setFeaturedSources(parsed);
+          setFeaturedSourcesLoaded(true);
+        }
+      } catch {
+        window.sessionStorage.removeItem("lbgf_featured_podcasts_v1");
+      }
+    }
+
+    getFeaturedContentSources()
+      .then((sources) => {
+        setFeaturedSources(sources || []);
+        setFeaturedSourcesLoaded(true);
+        window.sessionStorage.setItem("lbgf_featured_podcasts_v1", JSON.stringify(sources || []));
+      })
+      .catch(() => {
+        setFeaturedSourcesLoaded(true);
+      });
 
     run();
   }, []);
@@ -122,7 +144,25 @@ export default function AppHomePage() {
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
           <h3 style={{ marginTop: 0 }}>Featured Podcasts</h3>
-          {featuredSources.length ? (
+          {!featuredSourcesLoaded ? (
+            <div aria-live="polite" style={{ display: "grid", gap: 10 }}>
+              {[0, 1, 2].map((item) => (
+                <div
+                  key={item}
+                  style={{
+                    border: "1px solid #f1dfe8",
+                    borderRadius: 16,
+                    padding: 12,
+                    background: "#fff7fb",
+                  }}
+                >
+                  <div style={{ width: "45%", height: 16, borderRadius: 999, background: "#f1dfe8", marginBottom: 10 }} />
+                  <div style={{ width: "85%", height: 12, borderRadius: 999, background: "#f1dfe8", marginBottom: 8 }} />
+                  <div style={{ width: "60%", height: 12, borderRadius: 999, background: "#f1dfe8" }} />
+                </div>
+              ))}
+            </div>
+          ) : featuredSources.length ? (
             <>
               {featuredSources.slice(0, visiblePodcastCount).map((source) => (
                 <div key={source.id} style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, marginBottom: 10 }}>
