@@ -391,11 +391,43 @@ export async function getGameReactionSummary(participation_id: string) {
 
 
 export async function getViewerRoleFlags(userId: string) {
-  const [{ data: profile }, { data: candidate }] = await Promise.all([
-    supabase.from("profiles").select("id, display_name, bio, photo_url, photo_urls, karma_points, membership_status").eq("id", userId).maybeSingle(),
-    supabase.from("waiting_room_candidates").select("id, status").eq("user_id", userId).maybeSingle(),
+  const [profileResult, candidateResult] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, display_name, bio, photo_url, photo_urls, karma_points, membership_status, is_banned, is_moderator")
+      .eq("id", userId)
+      .maybeSingle(),
+    supabase
+      .from("waiting_room_candidates")
+      .select("id, status")
+      .eq("user_id", userId)
+      .maybeSingle(),
   ]);
-  const canReview = !!profile && !!String(profile.display_name || "").trim() && !!String(profile.bio || "").trim() && (!!profile.photo_url || (profile.photo_urls || []).length > 0) && Number(profile.karma_points || 0) > 0;
+
+  let adminRow: any = null;
+
+  try {
+    const { data } = await supabase
+      .from("admin_users")
+      .select("user_id, role")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    adminRow = data;
+  } catch {
+    adminRow = null;
+  }
+
+  const profile = profileResult.data;
+  const candidate = candidateResult.data;
+
+  const active =
+    !!profile &&
+    !profile.is_banned &&
+    !["removed", "banned"].includes(String(profile.membership_status || "").toLowerCase());
+
+  const canReview = active && (!!profile?.is_moderator || !!adminRow);
+
   return { profile, candidate, canReview };
 }
 

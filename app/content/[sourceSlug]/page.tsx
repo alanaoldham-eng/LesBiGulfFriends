@@ -125,7 +125,7 @@ export default function ContentSourcePage() {
             ))
           ) : (
             <p style={{ margin: 0, opacity: 0.8 }}>
-              No synced items yet. Seed or sync this source to populate the list.
+              No synced items yet. Admins and moderators can add or sync this RSS feed from Admin Dashboard → Curate featured content.
             </p>
           )}
         </section>

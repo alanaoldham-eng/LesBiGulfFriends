@@ -7,6 +7,7 @@ import { ClientShell } from "../../components/ClientShell";
 import { StatusModal } from "../../components/StatusModal";
 import { getCurrentUser } from "../../lib/auth";
 import { getMainGroupId } from "../../lib/db";
+import { supabase } from "../../lib/supabase/client";
 import {
   answerDisplay,
   getKreweCompletionStatus,
@@ -154,6 +155,14 @@ export default function KreweVibePage() {
       );
 
       if (completed) {
+        try {
+          await supabase.rpc("notify_reception_reviewers_rpc", {
+            _candidate_user_id: me,
+          });
+        } catch {
+          // Do not block the member redirect if reviewer notification fails.
+        }
+
         window.setTimeout(() => {
           void goToMainGroup();
         }, 900);

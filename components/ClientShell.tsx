@@ -148,7 +148,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       {(canReview || isAdmin) ? <Link href="/proposals" style={menuItemStyle} onClick={closeMenus}>Proposals</Link> : null}
       {(canReview || isAdmin) ? <Link href="/waiting-room" style={menuItemStyle} onClick={closeMenus}>Waiting Room</Link> : null}
       <Link href="/feedback" style={menuItemStyle} onClick={closeMenus}>Bug / Feature</Link>
-      {isAdmin ? <Link href="/admin-rewards" style={menuItemStyle} onClick={closeMenus}>Admin Magic Wand</Link> : null}
+      {isAdmin ? <Link href="/admin-rewards" style={menuItemStyle} onClick={closeMenus}>Admin Dashboard</Link> : null}
       {isLoggedIn ? <button type="button" style={menuItemStyle} onClick={() => signOutEverywhere()}>Logout</button> : null}
     </div>
   ) : null;

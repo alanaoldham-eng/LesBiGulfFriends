@@ -43,13 +43,14 @@ export default function LoginPage() {
 
       if (profile?.is_banned || ["removed", "banned"].includes(String(profile?.membership_status || "").toLowerCase())) {
         await supabase.auth.signOut();
-        document.cookie = "lbgf_session=; Path=/; Max-Age=0; SameSite=Lax";
-        throw new Error("This account has been removed from Les Bi Gulf Friends.");
+        throw new Error("This account is not available.");
       }
 
       const hasDisplayName = !!profile?.display_name?.trim() && profile?.display_name !== "New Member";
+      const needsReception = ["waiting", "pending"].includes(String(profile?.membership_status || "").toLowerCase());
+
       localStorage.setItem("lbgf_profile_started", hasDisplayName ? "1" : "0");
-      window.location.href = hasDisplayName ? "/app" : "/profile";
+      window.location.href = needsReception ? "/krewe-vibe" : hasDisplayName ? "/app" : "/profile";
     } catch (e: any) {
       setStatus(e.message || "Unable to log in.");
     } finally {

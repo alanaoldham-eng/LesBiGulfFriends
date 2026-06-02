@@ -1,4 +1,4 @@
-# v096.1 Krewe Vibe Syntax Fix
+# v097.2 Roadmap Build Fix
 
 Apply:
 
@@ -8,9 +8,8 @@ npm run build
 ```
 
 Fix:
-- Removes the accidental double comma in `lib/kreweVibe.ts`:
-  - bad: `},,`
-  - fixed: `},`
+- Removes `.catch()` from a Supabase/PostgREST builder chain in `lib/roadmap.ts`.
+- Rewrites `getViewerRoleFlags()` so the `admin_users` lookup is handled with normal `try/catch`.
 
 File changed:
-- `lib/kreweVibe.ts`
+- `lib/roadmap.ts`

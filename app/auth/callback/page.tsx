@@ -25,13 +25,21 @@ export default function AuthCallbackPage() {
         if (userData.user) {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("display_name")
+            .select("display_name, membership_status, is_banned")
             .eq("id", userData.user.id)
             .maybeSingle();
 
+          if (profile?.is_banned || ["removed", "banned"].includes(String(profile?.membership_status || "").toLowerCase())) {
+            await supabase.auth.signOut();
+            setMessage("This account is not available.");
+            return;
+          }
+
           const hasDisplayName = !!profile?.display_name?.trim() && profile?.display_name !== "New Member";
+          const needsReception = ["waiting", "pending"].includes(String(profile?.membership_status || "").toLowerCase());
+
           localStorage.setItem("lbgf_profile_started", hasDisplayName ? "1" : "0");
-          window.location.href = hasDisplayName ? "/app" : "/profile";
+          window.location.href = needsReception ? "/krewe-vibe" : hasDisplayName ? "/app" : "/profile";
           return;
         }
       }
