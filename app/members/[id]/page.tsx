@@ -5,7 +5,13 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ClientShell } from "../../../components/ClientShell";
 import { getCurrentUser } from "../../../lib/auth";
-import { getProfileById, getFriendIds, sendFriendRequest, listBadgesForUser, getMyProfile } from "../../../lib/db";
+import { sendFriendRequest } from "../../../lib/db";
+import {
+  areUsersFriendsFast,
+  getMemberDisplayNameFast,
+  getPublicMemberProfileFast,
+  listMemberBadgesFast,
+} from "../../../lib/memberProfile";
 
 async function sendFriendRequestEmailNotification(recipientUserId: string, requesterName: string) {
   try {
@@ -17,36 +23,104 @@ async function sendFriendRequestEmailNotification(recipientUserId: string, reque
   } catch {}
 }
 
+function LoadingProfileCard() {
+  return (
+    <ClientShell>
+      <section className="hero">
+        <h1 style={{ margin: 0, fontSize: 30 }}>Loading member profile...</h1>
+        <p style={{ fontSize: 16, lineHeight: 1.6, opacity: 0.85 }}>
+          Pulling up their public profile.
+        </p>
+      </section>
+
+      <div className="grid">
+        <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
+          <div style={{ width: 120, height: 120, borderRadius: 20, background: "#fff7fb", border: "1px solid #ead5df", marginBottom: 12 }} />
+          <div style={{ width: "45%", height: 18, borderRadius: 999, background: "#f1dfe8", marginBottom: 12 }} />
+          <div style={{ width: "90%", height: 12, borderRadius: 999, background: "#f1dfe8", marginBottom: 8 }} />
+          <div style={{ width: "70%", height: 12, borderRadius: 999, background: "#f1dfe8" }} />
+        </section>
+      </div>
+    </ClientShell>
+  );
+}
+
 export default function MemberProfilePage() {
   const params = useParams<{ id: string }>();
   const memberId = params?.id || "";
   const [me, setMe] = useState("");
   const [profile, setProfile] = useState<any | null>(null);
-  const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [profileUnavailable, setProfileUnavailable] = useState(false);
+  const [isFriend, setIsFriend] = useState(false);
+  const [friendshipLoaded, setFriendshipLoaded] = useState(false);
   const [status, setStatus] = useState("");
   const [badges, setBadges] = useState<any[]>([]);
+  const [badgesLoaded, setBadgesLoaded] = useState(false);
   const [eventBadgesOpen, setEventBadgesOpen] = useState(false);
   const [votedBadgesOpen, setVotedBadgesOpen] = useState(false);
   const [myName, setMyName] = useState("A member");
 
   useEffect(() => {
     if (!memberId) return;
+
+    let mounted = true;
+
     const run = async () => {
+      setIsLoadingProfile(true);
+      setProfileUnavailable(false);
+      setBadges([]);
+      setBadgesLoaded(false);
+      setIsFriend(false);
+      setFriendshipLoaded(false);
+      setStatus("");
+
       const user = await getCurrentUser().catch(() => null);
-      if (!user) return;
+      if (!mounted) return;
+
+      if (!user) {
+        setIsLoadingProfile(false);
+        setProfileUnavailable(true);
+        return;
+      }
+
       setMe(user.id);
-      const [p, ids, badgeRows, myProfile]: [any, Set<string>, any[], any] = await Promise.all([
-        getProfileById(memberId).catch(() => null),
-        getFriendIds(user.id).catch(() => new Set<string>()),
-        listBadgesForUser(memberId).catch(() => []),
-        getMyProfile(user.id).catch(() => null),
-      ]);
-      setProfile(p);
-      setFriendIds(ids);
-      setBadges(p ? badgeRows : []);
-      setMyName(myProfile?.display_name || "A member");
+
+      const memberProfile = await getPublicMemberProfileFast(memberId).catch(() => null);
+      if (!mounted) return;
+
+      if (!memberProfile) {
+        setProfile(null);
+        setIsLoadingProfile(false);
+        setProfileUnavailable(true);
+        return;
+      }
+
+      setProfile(memberProfile);
+      setIsLoadingProfile(false);
+
+      // Secondary details should not block the profile from appearing.
+      void Promise.all([
+        user.id === memberId
+          ? Promise.resolve(false)
+          : areUsersFriendsFast(user.id, memberId).catch(() => false),
+        listMemberBadgesFast(memberId).catch(() => []),
+        getMemberDisplayNameFast(user.id).catch(() => "A member"),
+      ]).then(([friend, badgeRows, displayName]) => {
+        if (!mounted) return;
+        setIsFriend(!!friend);
+        setFriendshipLoaded(true);
+        setBadges(badgeRows || []);
+        setBadgesLoaded(true);
+        setMyName(displayName || "A member");
+      });
     };
+
     run();
+
+    return () => {
+      mounted = false;
+    };
   }, [memberId]);
 
   const addFriend = async () => {
@@ -54,6 +128,7 @@ export default function MemberProfilePage() {
     try {
       const result: any = await sendFriendRequest(me, memberId);
       setStatus(result?.duplicate ? "Friend request already pending." : "Friend request sent.");
+      setIsFriend(true);
       if (!result?.duplicate) await sendFriendRequestEmailNotification(memberId, myName);
     } catch (e: any) {
       setStatus(e.message || "Unable to send friend request.");
@@ -63,7 +138,6 @@ export default function MemberProfilePage() {
   const mainPhoto = profile?.photo_urls?.[0] || profile?.photo_url || null;
   const extraPhotos = (profile?.photo_urls || []).slice(1, 3);
   const isSelf = me === memberId;
-  const isFriend = friendIds.has(memberId);
 
   const parseBadgeDate = (badge: any) => {
     const raw = `${badge.badge_label || ""} ${badge.created_at || ""}`;
@@ -111,7 +185,9 @@ export default function MemberProfilePage() {
     </span>
   );
 
-  if (!profile) {
+  if (isLoadingProfile) return <LoadingProfileCard />;
+
+  if (profileUnavailable) {
     return (
       <ClientShell>
         <section className="hero">
@@ -147,7 +223,10 @@ export default function MemberProfilePage() {
           ) : null}
           {profile?.city ? <p style={{ opacity: 0.75 }}>City: {profile.city}</p> : null}
           {profile?.relationship_status ? <p style={{ opacity: 0.75 }}>Relationship status: {profile.relationship_status}</p> : null}
-          {badges.length ? (
+
+          {!badgesLoaded ? (
+            <p style={{ opacity: 0.65 }}>Loading badges...</p>
+          ) : badges.length ? (
             <div className="badge-stack" style={{ display: "grid", gap: 10, marginBottom: 12 }}>
               {badgeGroups.og.length ? (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -176,9 +255,10 @@ export default function MemberProfilePage() {
               {badgeGroups.other.length ? <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{badgeGroups.other.map(renderBadge)}</div> : null}
             </div>
           ) : null}
+
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-            {!isSelf && !isFriend ? <button className="button" onClick={addFriend}>Add Friend</button> : null}
-            {!isSelf && isFriend ? <Link className="button secondary" href={`/messages?thread=${encodeURIComponent(memberId)}`}>Chat</Link> : null}
+            {!isSelf && friendshipLoaded && !isFriend ? <button className="button" onClick={addFriend}>Add Friend</button> : null}
+            {!isSelf && friendshipLoaded && isFriend ? <Link className="button secondary" href={`/messages?thread=${encodeURIComponent(memberId)}`}>Chat</Link> : null}
           </div>
           {status ? <p style={{ marginTop: 12, opacity: 0.8 }}>{status}</p> : null}
         </section>

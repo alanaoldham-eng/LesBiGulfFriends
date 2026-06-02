@@ -2,11 +2,7 @@
 
 import { supabase } from "./supabase/client";
 
-function coalesceStatus(value: any) {
-  return String(value || "").toLowerCase();
-}
-
-export async function listGroupMessagesDetailedUnlimited(groupId: string, limit = 5000) {
+export async function listGroupMessagesDetailedUnlimited(groupId: string, limit = 75) {
   const { data: messages, error } = await supabase
     .from("group_messages")
     .select("*")
@@ -16,40 +12,51 @@ export async function listGroupMessagesDetailedUnlimited(groupId: string, limit 
 
   if (error) throw error;
 
-  const senderIds = [...new Set((messages || []).map((m: any) => m.sender_id))];
+  const rows = messages || [];
+  const messageIds = rows.map((m: any) => m.id);
+  const senderIds = [...new Set(rows.map((m: any) => m.sender_id).filter(Boolean))];
+
   let profileMap = new Map<string, any>();
 
   if (senderIds.length) {
     const { data: profiles, error: profileError } = await supabase
       .from("profiles")
-      .select("id, display_name, photo_url, photo_urls, bio, city, relationship_status, membership_status, is_banned")
-      .in("id", senderIds)
-      .eq("is_banned", false)
-      .neq("membership_status", "removed")
-      .neq("membership_status", "banned");
+      .select("id, display_name, photo_url, photo_urls, bio, city, relationship_status, karma_points, membership_status, is_banned")
+      .in("id", senderIds);
 
     if (profileError) throw profileError;
-    profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+    profileMap = new Map(
+      (profiles || [])
+        .filter((p: any) => !p.is_banned && !["removed", "banned"].includes(String(p.membership_status || "").toLowerCase()))
+        .map((p: any) => [p.id, p])
+    );
   }
 
-  const { data: reactions, error: reactionError } = await supabase
-    .from("group_message_reactions")
-    .select("*")
-    .eq("group_id", groupId);
+  let reactions: any[] = [];
 
-  if (reactionError) throw reactionError;
+  if (messageIds.length) {
+    const { data, error: reactionError } = await supabase
+      .from("group_message_reactions")
+      .select("*")
+      .eq("group_id", groupId)
+      .in("message_id", messageIds);
+
+    if (reactionError) throw reactionError;
+    reactions = data || [];
+  }
 
   const reactionsByMessage = new Map<string, any[]>();
-  (reactions || []).forEach((r: any) => {
+
+  reactions.forEach((r: any) => {
     reactionsByMessage.set(r.message_id, [...(reactionsByMessage.get(r.message_id) || []), r]);
   });
 
-  return (messages || [])
-    .filter((m: any) => coalesceStatus(m.moderation_status) !== "removed")
+  return rows
+    .filter((m: any) => m.moderation_status !== "removed")
     .map((m: any) => ({
       ...m,
       profile: profileMap.get(m.sender_id) || null,
       reactions: reactionsByMessage.get(m.id) || [],
-    }))
-    .filter((m: any) => !!m.profile);
+    }));
 }
