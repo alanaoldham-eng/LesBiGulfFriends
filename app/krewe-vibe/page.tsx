@@ -40,6 +40,7 @@ export default function KreweVibePage() {
   const [status, setStatus] = useState("");
   const [redirectAfterStatus, setRedirectAfterStatus] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
+  const [showCompatibilityQuestions, setShowCompatibilityQuestions] = useState(false);
   const [loading, setLoading] = useState(true);
   const [completion, setCompletion] = useState({ answeredCount: 0, requiredCount: 18, complete: false });
 
@@ -84,6 +85,16 @@ export default function KreweVibePage() {
 
     return Array.from(map.entries());
   }, [questions]);
+
+  const mainQuestionGroups = useMemo(
+    () => grouped.filter(([section]) => section !== "Optional Compatibility Questions"),
+    [grouped]
+  );
+
+  const compatibilityQuestions = useMemo(
+    () => grouped.find(([section]) => section === "Optional Compatibility Questions")?.[1] || [],
+    [grouped]
+  );
 
   const setAnswer = (question: any, value: any) => {
     setAnswers((current) => ({ ...current, [question.id]: value }));
@@ -196,12 +207,40 @@ export default function KreweVibePage() {
           background: "#fff",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
-          <h3 style={{ marginTop: 0, marginBottom: 8 }}>{question.question_text}</h3>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr) auto",
+            gap: 12,
+            alignItems: "start",
+          }}
+        >
+          <h3 style={{ marginTop: 0, marginBottom: 8, minWidth: 0 }}>{question.question_text}</h3>
           {question.required ? (
-            <span style={{ fontSize: 12, color: "#8d2d5d", fontWeight: 800 }}>Required</span>
+            <span
+              style={{
+                fontSize: 12,
+                color: "#8d2d5d",
+                fontWeight: 800,
+                whiteSpace: "nowrap",
+                minWidth: "max-content",
+                lineHeight: 1.2,
+              }}
+            >
+              Required
+            </span>
           ) : (
-            <span style={{ fontSize: 12, opacity: 0.65 }}>Optional</span>
+            <span
+              style={{
+                fontSize: 12,
+                opacity: 0.65,
+                whiteSpace: "nowrap",
+                minWidth: "max-content",
+                lineHeight: 1.2,
+              }}
+            >
+              Optional
+            </span>
           )}
         </div>
 
@@ -284,7 +323,7 @@ export default function KreweVibePage() {
           </section>
         ) : null}
 
-        {grouped.map(([section, sectionQuestions]) => (
+        {mainQuestionGroups.map(([section, sectionQuestions]) => (
           <div key={section} className="grid">
             <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff7fb" }}>
               <h2 style={{ margin: 0, fontSize: 22 }}>{section}</h2>
@@ -293,6 +332,40 @@ export default function KreweVibePage() {
             {sectionQuestions.map(renderQuestion)}
           </div>
         ))}
+
+        {compatibilityQuestions.length ? (
+          <section
+            style={{
+              border: "1px solid #e9d7e2",
+              borderRadius: 20,
+              padding: 16,
+              background: "#fff7fb",
+            }}
+          >
+            <h2 style={{ marginTop: 0, fontSize: 22 }}>Optional Compatibility Questions</h2>
+            <p style={{ opacity: 0.8, lineHeight: 1.6 }}>
+              Answer compatibility questions so that we can suggest new friends who you will be
+              compatible with based on your personalities.
+            </p>
+            <p style={{ opacity: 0.7, lineHeight: 1.6, fontSize: 14 }}>
+              Inspired by common personality compatibility dimensions such as social energy,
+              planning style, support style, novelty, and decision-making preferences.
+            </p>
+            <button
+              type="button"
+              className={showCompatibilityQuestions ? "button secondary" : "button"}
+              onClick={() => setShowCompatibilityQuestions((value) => !value)}
+            >
+              {showCompatibilityQuestions ? "Hide compatibility questions" : "Answer compatibility questions"}
+            </button>
+          </section>
+        ) : null}
+
+        {showCompatibilityQuestions ? (
+          <div className="grid">
+            {compatibilityQuestions.map(renderQuestion)}
+          </div>
+        ) : null}
 
         <button className="button" onClick={saveAll} disabled={saving || !me || loading || !questions.length}>
           {saving ? "Saving..." : "Save Krewe Vibe"}

@@ -277,6 +277,94 @@ export const KREWE_QUESTION_CONFIG: Record<string, QuestionConfig> = {
     section: "Final Vibe Check",
     required: false,
   },
+  compat_social_battery: {
+    question_key: "compat_social_battery",
+    question_text: "After a social event, what usually helps you recharge?",
+    category: "compatibility",
+    is_public: true,
+    display_order: 210,
+    answer_type: "single_choice",
+    options: ["Quiet time alone", "A small cozy hangout", "Talking it out with a close friend", "Jumping into the next activity"],
+    section: "Optional Compatibility Questions",
+    required: false,
+  },
+  compat_planning_style: {
+    question_key: "compat_planning_style",
+    question_text: "When making plans with friends, what style works best for you?",
+    category: "compatibility",
+    is_public: true,
+    display_order: 220,
+    answer_type: "single_choice",
+    options: ["Plan ahead with details", "A loose plan is enough", "I like spontaneous plans", "I prefer someone else to organize"],
+    section: "Optional Compatibility Questions",
+    required: false,
+  },
+  compat_communication_frequency: {
+    question_key: "compat_communication_frequency",
+    question_text: "How often do you like to check in with close friends?",
+    category: "compatibility",
+    is_public: true,
+    display_order: 230,
+    answer_type: "single_choice",
+    options: ["Daily or almost daily", "A few times a week", "When something comes up", "Low-pressure and occasional"],
+    section: "Optional Compatibility Questions",
+    required: false,
+  },
+  compat_support_style: {
+    question_key: "compat_support_style",
+    question_text: "When a friend is having a hard day, what kind of support feels most natural to you?",
+    category: "compatibility",
+    is_public: true,
+    display_order: 240,
+    answer_type: "multi_choice",
+    options: ["Listening without fixing", "Helping with practical tasks", "Making them laugh", "Giving thoughtful advice", "Giving them space"],
+    section: "Optional Compatibility Questions",
+    required: false,
+  },
+  compat_new_experience_style: {
+    question_key: "compat_new_experience_style",
+    question_text: "How do you feel about trying new places, events, or activities?",
+    category: "compatibility",
+    is_public: true,
+    display_order: 250,
+    answer_type: "single_choice",
+    options: ["I love novelty", "I like new things with trusted people", "I prefer familiar places", "It depends on my energy"],
+    section: "Optional Compatibility Questions",
+    required: false,
+  },
+  compat_decision_style: {
+    question_key: "compat_decision_style",
+    question_text: "In group plans, how do you prefer decisions to get made?",
+    category: "compatibility",
+    is_public: true,
+    display_order: 260,
+    answer_type: "single_choice",
+    options: ["Consensus", "Someone kindly takes the lead", "Vote and move forward", "Keep it flexible"],
+    section: "Optional Compatibility Questions",
+    required: false,
+  },
+  compat_friendship_pace: {
+    question_key: "compat_friendship_pace",
+    question_text: "What pace feels best when building a new friendship?",
+    category: "compatibility",
+    is_public: true,
+    display_order: 270,
+    answer_type: "single_choice",
+    options: ["Slow and steady", "Warm quickly if it feels right", "Start casual and see", "I like frequent invitations early"],
+    section: "Optional Compatibility Questions",
+    required: false,
+  },
+  compat_homebody_outgoing: {
+    question_key: "compat_homebody_outgoing",
+    question_text: "Which weekend rhythm sounds most like you?",
+    category: "compatibility",
+    is_public: true,
+    display_order: 280,
+    answer_type: "single_choice",
+    options: ["Homebody recharge", "One good outing", "Full social calendar", "Depends on the week"],
+    section: "Optional Compatibility Questions",
+    required: false,
+  }
 };
 
 export function requiredKreweQuestionKeys() {
@@ -484,6 +572,14 @@ const COMMUNICATION_KEYWORDS = [
   "communication",
 ];
 
+
+const COMPATIBILITY_KEYWORDS = [
+  "quiet", "alone", "cozy", "talking", "activity", "details", "loose", "spontaneous",
+  "organize", "daily", "weekly", "occasional", "listening", "practical", "laugh",
+  "advice", "space", "novelty", "trusted", "familiar", "energy", "consensus",
+  "lead", "vote", "flexible", "slow", "steady", "casual", "homebody", "outing", "calendar",
+];
+
 const RED_FLAG_KEYWORDS = [
   "drama",
   "revenge",
@@ -530,7 +626,7 @@ function privacyConflictRedFlags(answers: any[]) {
   return count;
 }
 
-function sharedKeywordScore(myAnswers: any[], theirAnswers: any[], category: "community" | "events" | "communication" | "interests") {
+function sharedKeywordScore(myAnswers: any[], theirAnswers: any[], category: "community" | "events" | "communication" | "compatibility" | "interests") {
   const keywords =
     category === "community"
       ? COMMUNITY_KEYWORDS
@@ -538,7 +634,9 @@ function sharedKeywordScore(myAnswers: any[], theirAnswers: any[], category: "co
         ? EVENT_KEYWORDS
         : category === "communication"
           ? COMMUNICATION_KEYWORDS
-          : [];
+          : category === "compatibility"
+            ? COMPATIBILITY_KEYWORDS
+            : [];
 
   const mine = new Set(myAnswers.flatMap((answer) => keywordHits(answer, keywords)));
   const theirs = new Set(theirAnswers.flatMap((answer) => keywordHits(answer, keywords)));
@@ -606,6 +704,12 @@ export async function listKreweFriendSuggestions(userId: string) {
       if (communication.length) {
         score += Math.min(communication.length, 2) * 2;
         reasons.push(`Compatible communication style: ${communication.slice(0, 2).join(", ")}`);
+      }
+
+      const compatibility = sharedKeywordScore(myAnswers, theirAnswers, "compatibility");
+      if (compatibility.length) {
+        score += Math.min(compatibility.length, 3) * 2;
+        reasons.push(`Optional compatibility overlap: ${compatibility.slice(0, 3).join(", ")}`);
       }
 
       const theirInterests = new Set(((profile.interests || []) as string[]).map((x) => String(x).toLowerCase()));
