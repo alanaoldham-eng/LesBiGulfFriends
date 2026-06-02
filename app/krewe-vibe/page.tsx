@@ -2,9 +2,11 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ClientShell } from "../../components/ClientShell";
 import { StatusModal } from "../../components/StatusModal";
 import { getCurrentUser } from "../../lib/auth";
+import { getMainGroupId } from "../../lib/db";
 import {
   answerDisplay,
   getKreweCompletionStatus,
@@ -30,11 +32,13 @@ function ToggleOption({
 }
 
 export default function KreweVibePage() {
+  const router = useRouter();
   const [me, setMe] = useState("");
   const [questions, setQuestions] = useState<any[]>([]);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
+  const [redirectAfterStatus, setRedirectAfterStatus] = useState(false);
   const [loading, setLoading] = useState(true);
   const [completion, setCompletion] = useState({ answeredCount: 0, requiredCount: 18, complete: false });
 
@@ -103,6 +107,7 @@ export default function KreweVibePage() {
 
     setSaving(true);
     setStatus("");
+    setRedirectAfterStatus(false);
 
     try {
       for (const question of questions) {
@@ -128,8 +133,10 @@ export default function KreweVibePage() {
       const nextCompletion = await getKreweCompletionStatus(me).catch(() => completion);
       setCompletion(nextCompletion);
 
+      const completed = !!nextCompletion.complete;
+      setRedirectAfterStatus(completed);
       setStatus(
-        nextCompletion.complete
+        completed
           ? "Krewe Vibe complete. Your answers will help us suggest better friends, events, and groups."
           : "Krewe Vibe saved. You can come back and finish the remaining required questions."
       );
@@ -137,6 +144,21 @@ export default function KreweVibePage() {
       setStatus(e.message || "Unable to save Krewe Vibe.");
     } finally {
       setSaving(false);
+    }
+  };
+
+
+  const closeStatus = async () => {
+    setStatus("");
+
+    if (!redirectAfterStatus) return;
+
+    const mainGroupId = await getMainGroupId().catch(() => null);
+
+    if (mainGroupId) {
+      router.push(`/groups-app/${mainGroupId}`);
+    } else {
+      router.push("/groups-app");
     }
   };
 
@@ -256,7 +278,7 @@ export default function KreweVibePage() {
         </button>
       </div>
 
-      <StatusModal open={!!status} message={status} onClose={() => setStatus("")} />
+      <StatusModal open={!!status} message={status} onClose={closeStatus} />
     </ClientShell>
   );
 }
