@@ -26,6 +26,7 @@ export default function AppHomePage() {
   const [groupCount, setGroupCount] = useState(0);
   const [karmaPoints, setKarmaPoints] = useState(0);
   const [featuredSources, setFeaturedSources] = useState<any[]>([]);
+  const [visiblePodcastCount, setVisiblePodcastCount] = useState(5);
   const [recentConfessions, setRecentConfessions] = useState<any[]>([]);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [needsKreweVibe, setNeedsKreweVibe] = useState(false);
@@ -120,17 +121,31 @@ export default function AppHomePage() {
         </section>
 
         <section style={{ border: "1px solid #e9d7e2", borderRadius: 20, padding: 16, background: "#fff" }}>
-          <h3 style={{ marginTop: 0 }}>Featured this week</h3>
-          {featuredSources.length ? featuredSources.slice(0, 2).map((source) => (
-            <div key={source.id} style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, marginBottom: 10 }}>
-              <strong>{source.title}</strong>
-              <p style={{ margin: "6px 0 10px", opacity: 0.8 }}>
-                {source.editorial_note || source.description}
-              </p>
-              <Link className="button secondary" href={`/content/${source.slug}`}>Open</Link>
-            </div>
-          )) : (
-            <p style={{ opacity: 0.75 }}>No featured content yet.</p>
+          <h3 style={{ marginTop: 0 }}>Featured Podcasts</h3>
+          {featuredSources.length ? (
+            <>
+              {featuredSources.slice(0, visiblePodcastCount).map((source) => (
+                <div key={source.id} style={{ border: "1px solid #f1dfe8", borderRadius: 16, padding: 12, marginBottom: 10 }}>
+                  <strong>{source.title}</strong>
+                  <p style={{ margin: "6px 0 10px", opacity: 0.8 }}>
+                    {source.editorial_note || source.description}
+                  </p>
+                  <Link className="button secondary" href={`/content/${source.slug}`}>Open</Link>
+                </div>
+              ))}
+
+              {featuredSources.length > visiblePodcastCount ? (
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => setVisiblePodcastCount((count) => count + 5)}
+                >
+                  Load more podcasts
+                </button>
+              ) : null}
+            </>
+          ) : (
+            <p style={{ opacity: 0.75 }}>No featured podcasts yet.</p>
           )}
         </section>
 

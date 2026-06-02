@@ -1,4 +1,4 @@
-# v097.2 Roadmap Build Fix
+# v097.3 Featured Podcasts Landing Patch
 
 Apply:
 
@@ -7,9 +7,11 @@ Apply:
 npm run build
 ```
 
-Fix:
-- Removes `.catch()` from a Supabase/PostgREST builder chain in `lib/roadmap.ts`.
-- Rewrites `getViewerRoleFlags()` so the `admin_users` lookup is handled with normal `try/catch`.
+Changes:
+- Renames landing page section from "Featured this week" to "Featured Podcasts".
+- Shows 5 featured podcast sources on the landing page instead of 2.
+- Adds a "Load more podcasts" button when more than 5 featured sources exist.
+- Changes empty state copy to "No featured podcasts yet."
 
 File changed:
-- `lib/roadmap.ts`
+- `app/app/page.tsx`
